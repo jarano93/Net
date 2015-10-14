@@ -9,6 +9,12 @@ import mod_pcg as pcg
 def _randND(*dims)
     return np.random.rand(dims)*2 - 1 # ayo, static type this
 
+def _norm(ndArray)
+    dims = ndArray.shape()
+    dims_length = len(dims)
+    axes_list = range(dims_length)
+    return np.tensordot(ndArray, ndArray, axes=(axes_list, axes_list))
+
 class Net:
     """defines a neural network object"""
     def __init__(self, input_shape, output_shape, layer_data):
@@ -53,26 +59,41 @@ class Net:
         if input.shape() != self.input_shape:
             raise ValueError("Input dimensions not match expected dimensions")
         
-    def train(target, stop):
+    def train(input, target, stop):
         if target.shape() != self.output_shape:
             raise ValueError("Target dimensions do not match output dimensions")    
         if 'TOL' in stop:
             # train to a certain tolerance 
-            self.__trainTOL(target, stop['TOL'])
+            self.__trainTOL(input, target, stop['TOL'])
         elif 'N' in stop:
             # train N times
-            self.__trainN(target, stop['N'])
+            self.__trainN(input, target, stop['N'])
+        elif 'min' in stop:
+            #train until error function is minimized
+            self.__trainMin(input, target)
         else:
             raise TypeError("Undefined stopping condition for training")
 
-    def __trainTOL(target, TOL):
-        accuracy = 0.
-        while accuracy < TOL:
+    def __trainTOL(input, target, TOL):
+        err = self.__percentErr(input, target)
+        while err < TOL:
             self.__backprop(target)
+            self.__percentErr(input, target)
 
-    def __trainN(target, N):
+    def __trainN(input, target, N):
         for i in range(N):
             self.__backprop(target)
+
+    def __trainMin(input, target):
+        #minimize __sum_sq_err
+
+    def __percentErr(input, target):
+        #frobenius (L2) norm used to calculate error
+        abs_error = _norm(self.feedforward(input) - target)
+        return abs_error / _norm(target)
+
+    def __sum_sq_err(input, target):
+        return pow(_norm(self.feedforward(input) - target), 2) / 2
 
     def __backprop(target):
         return "ayylmao"
