@@ -2,6 +2,7 @@
 # _moduleFunc for module private -- will not be imported
 # __classFunc for class private -- it's not actually private, but it's tradition
 import numpy as np
+import math
 import cython # BE SURE TO STATIC TYPE WHAT NEEDS TO BE STATIC TYPED, BRUH
 import mod_pcg as pcg
 
@@ -75,3 +76,9 @@ class Net:
 
     def __backprop(target):
         return "ayylmao"
+
+    def __sigmoid(x):
+        return 1 / (1 + math.exp(-x))
+
+    def __dsigmoid(x):
+        return math.exp(x) / pow(1 + math.exp(x), 2)
