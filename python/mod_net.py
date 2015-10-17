@@ -3,8 +3,8 @@
 # __classFunc for class private -- it's not actually private, but it's tradition
 import numpy as np
 import math
-import cython # BE SURE TO STATIC TYPE WHAT NEEDS TO BE STATIC TYPED, BRUH
-import mod_pcg as pcg
+# import cython # BE SURE TO STATIC TYPE WHAT NEEDS TO BE STATIC TYPED, BRUH
+import mod_opt as opt
 
 def _randND(*dims)
     return np.random.rand(dims)*2 - 1 # ayo, static type this

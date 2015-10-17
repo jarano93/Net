@@ -3,5 +3,8 @@
 import numpy as np
 import mod_hfo as hfo
 
-def PreGraDes():
+def CGD():
+    return 0
+
+def PCG():
     return 0
