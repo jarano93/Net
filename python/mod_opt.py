@@ -17,7 +17,7 @@ def cgd(A, x, b, tol):
         x = x + np.dot(alpha, p)
         res = res - alpha * Ap
         res_norm_new = la.norm(res)
-        if res_norm_old < tol:
+        if res_norm_new < tol:
             break
         p = r + (res_norm_new / res_norm_old) * p
         res_norm_old = res_norm_new
