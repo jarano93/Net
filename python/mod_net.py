@@ -23,54 +23,51 @@ def _sum_sq_err(input, target):
 
 class Net:
     """defines a neural network object"""
-    def __init__(self, input_shape, output_shape, layer_data):
+
+    bias_val = 1
+
+    def __init__(self, input_len, output_len, layer0_len, layer1_len, layer2_len):
         """This instantiates a neural network
         
         Args:
             self (obj) -- the object being instatiated itself, implicitly called
-            input_shape (tuple) -- defines the dimensions of the input data
-            output_shape (tuple) -- defines the dimensions of the output data
-            layer_data (tuple) -- sets the number of layers and nodes per layer
-                number of layers is number of size of the tuple
-                each individual elem defines the number of nodes in that layer
+                            WIP           
         """
-        self.input_shape = input_shape
-        self.output_shape = output_shape
-        self.hidden_weights = {}
-        layer_data_len = len(layer_data)
-        if layer_data_len < 1:
-            raise ValueError("layer_data needs an element")
-        for i in range(0,layer_data_len):
-            if type(layer_data[i]) != int:
-                raise TypeError("layer_data must be a tuple of ints")
-            if layer_data[i] < 1:
-                raise ValueError("Each layer needs atleast one node")
-        self.num_weight_sets = layer_data_len + 1
-        #BE SURE TO STATIC TYPE THIS BITCH FOR CYTHON
-        temp_weights
-        temp_shape
-        for i in range(0, layer_data_len):
-            if i == 0:
-                # set first hidden node layer weights to fit input_shape
-                temp_shape = (layer_data[0]) + input_shape
-            else:
-                temp_shape = (layer_data[i], layer_data[i-1])
-            temp_weights = _randND(*temp_shape)
-            self.hidden_weights.update({i: temp_weights})
-            if i == layer_data_len - 1:
-                temp_shape = output_shape + (layer_data[i])
-                self.hidden_weights.update({i+1: _randND(*temp_shape)})
+        self.input_len = input_len
+        self.output_len = output_len
+        self.num_layers = 4
+        self.layers = {
+            0: np.zeros(layer0_len),
+            1: np.zeros(layer1_len),
+            2: np.zeros(layer2_len),
+            3: np.zeros(output_len),
+        }
 
-    def run(input):
-        """runs the net with given input without saving hidden activations"""
+        # add in bias term with + 1
+        self.weights = {
+            0: np.ones((layer0_len, input_len + 1)),
+            1: np.ones((layer1_len, layer0_len + 1)),
+            2: np.ones((layer2_len, layer1_len + 1)),
+            3: np.ones((output_len, layer2_len + 1)),
+        }
 
-    def __feedforward(input):
-        """runs the net with given input AND saves hidden activations"""
+    def feedforward(input):
+        """runs the net with given input and saves hidden activations"""
         if input.shape() != self.input_shape:
             raise ValueError("Input dimensions not match expected dimensions")
+        work_in = input
+        for i in range(self.num_layers):
+            work_in = work_in.append(bias_val)
+            for j in range(self.layers[i]):
+                temp_val = np.dot(work_in, weights[i][j])
+                self.layers[i][j] = np.tanh(temp_val)
+            if i == self.num_layers - 1:
+                return self.layers[i]
+            else:
+                work_in = self.layers[i]
         
     def train(input, target, stop):
-        if target.shape() != self.output_shape:
+        if target.shape() != self.output_len:
             raise ValueError("Target dimensions do not match output dimensions")    
         if 'TOL' in stop:
             # train to a certain tolerance 
@@ -83,11 +80,6 @@ class Net:
             self.__trainMin(input, target)
         else:
             raise TypeError("Undefined stopping condition for training")
-
-        #frobenius (L2) norm used to calculate error
-        abs_error = _norm(self.feedforward(input) - target)
-        return abs_error / _norm(target)
-
 
     def __backprop(target):
         return "ayylmao"
