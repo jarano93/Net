@@ -4,16 +4,22 @@
 import numpy as np
 import math
 # import cython # BE SURE TO STATIC TYPE WHAT NEEDS TO BE STATIC TYPED, BRUH
-import mod_opt as opt
+
+def _sigmoid(x):
+    return 1 / (1 + math.exp(-x))
+
+def _dsigmoid(x):
+    return math.exp(x) / pow(1 + math.exp(x), 2)
+
+def _dtanh(x):
+    return 1 - pow(np.tanh(x), 2)
 
 def _randND(*dims)
     return np.random.rand(dims)*2 - 1 # ayo, static type this
 
-def _norm(ndArray)
-    dims = ndArray.shape()
-    dims_length = len(dims)
-    axes_list = range(dims_length)
-    return np.tensordot(ndArray, ndArray, axes=(axes_list, axes_list))
+def _sum_sq_err(input, target):
+    residue = target - input
+    return 0.5 * np.dot(residue, residue)
 
 class Net:
     """defines a neural network object"""
@@ -55,7 +61,11 @@ class Net:
                 temp_shape = output_shape + (layer_data[i])
                 self.hidden_weights.update({i+1: _randND(*temp_shape)})
 
-    def feedforward(input):
+    def run(input):
+        """runs the net with given input without saving hidden activations"""
+
+    def __feedforward(input):
+        """runs the net with given input AND saves hidden activations"""
         if input.shape() != self.input_shape:
             raise ValueError("Input dimensions not match expected dimensions")
         
@@ -74,32 +84,10 @@ class Net:
         else:
             raise TypeError("Undefined stopping condition for training")
 
-    def __trainTOL(input, target, TOL):
-        err = self.__percentErr(input, target)
-        while err < TOL:
-            self.__backprop(target)
-            self.__percentErr(input, target)
-
-    def __trainN(input, target, N):
-        for i in range(N):
-            self.__backprop(target)
-
-    def __trainMin(input, target):
-        #minimize __sum_sq_err
-
-    def __percentErr(input, target):
         #frobenius (L2) norm used to calculate error
         abs_error = _norm(self.feedforward(input) - target)
         return abs_error / _norm(target)
 
-    def __sum_sq_err(input, target):
-        return pow(_norm(self.feedforward(input) - target), 2) / 2
 
     def __backprop(target):
         return "ayylmao"
-
-    def __sigmoid(x):
-        return 1 / (1 + math.exp(-x))
-
-    def __dsigmoid(x):
-        return math.exp(x) / pow(1 + math.exp(x), 2)
