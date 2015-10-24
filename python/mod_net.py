@@ -89,72 +89,6 @@ class Net:
         self.r_weight2 = self.g_weight2
         self.r_weight3 = self.g_weight3
 
-        """ 
-            self.num_layers = 3 I'm hardcoding :(
-
-            self.activation = {
-                0: np.zeros(layer0_len).T,
-                1: np.zeros(layer1_len).T,
-                2: np.zeros(layer2_len).T,
-            }
-
-            self.h_activation = {
-                0: np.zeros(layer0_len).T,
-                1: np.zeros(layer1_len).T,
-                2: np.zeros(layer2_len).T,
-            }
-
-            self.delta = {
-                0: np.zeros(layer0_len).T,
-                1: np.zeros(layer1_len).T,
-                2: np.zeros(layer2_len).T,
-                3: np.zeros(output_len).T,
-            }
-
-            self.r_activation = {
-                0: np.zeros(layer0_len).T,
-                1: np.zeros(layer1_len).T,
-                2: np.zeros(layer2_len).T,
-            }
-
-            self.r_h_activation = {
-                0: np.zeros(layer0_len),
-                1: np.zeros(layer1_len),
-                2: np.zeros(layer2_len),
-                3: np.zeros(output_len),
-            }
-
-            self.r_delta = {
-                0: np.zeros(layer0_len),
-                1: np.zeros(layer1_len),
-                2: np.zeros(layer2_len),
-                3: np.zeros(output_len),
-            }
-
-            self.num_weights = 4
-            add in bias term with + 1
-            # self.weight = {
-            #     0: np.ones((input_len + 1, layer0_len)),
-            #     1: np.ones((layer0_len + 1, layer1_len)),
-            #     2: np.ones((layer1_len + 1, layer2_len)),
-            #     3: np.ones((layer2_len + 1, output_len)),
-            # }
-
-            # self.weight_grad = {
-            #     0: np.zeros((input_len + 1, layer0_len)),
-            #     1: np.zeros((layer0_len + 1, layer1_len)),
-            #     2: np.zeros((layer1_len + 1, layer2_len)),
-            #     3: np.zeros((layer2_len + 1, output_len)),
-            # }
-            
-            # self.weight = {
-            #     0: np.ones((input_len + 1, layer0_len)),
-            #     1: np.ones((layer0_len + 1, layer1_len)),
-            #     2: np.ones((layer1_len + 1, layer2_len)),
-            #     3: np.ones((layer2_len + 1, output_len)),
-            # } 
-        """
-
     def feedforward(self, input):
         """runs the net with given input and saves hidden activations"""
         if input.shape() != self.input_shape:
@@ -183,19 +117,16 @@ class Net:
         for m in range(self.output_len):
             for l in range(self.layer2_len + 1):
                 self.g_weight3[l,m] = self.delta3[m] * self.hmap2[l]
-
         for l in range(self.layer2_len):
             for m in range(self.output_len):
                 self.delta2[l] += self.delta3[m] * self.weight3[l,m]
             for k in range(self.layer1_len + 1):
                 self.g_weight2[k,l] = self.delta2[l] * _dtanh(self.activation2[l]) * self.hmap1[k,l]
-
         for k in range(self.layer1_len):
             for l in range(self.layer2_len):
                 self.delta1[k] += self.delta2[l] * _dtanh(self.activation2[l]) * self.weight2[k,l]
             for j in range(self.layer1_len + 1):
                 self.g_weight1[j,k] = self.delta1[k] * _dtanh(self.activation1[k]) * self.hmap0[j,k]
-
         for j in range(self.layer0_len):
             for k in range(self.layer1_len):
                 self.delta0[j] += self.delta1[k[ * _dtanh(self.activation1[k]) * self.weight1[j,k]
@@ -262,16 +193,17 @@ class Net:
                 self.r_weight0[i,j] = self.r_delta0[j] * _dtanh(self.activation0[j]) * self.input[i]
                 self.r_weight0[i,j] += self.delta0[j] * _ddtanh(self.activation0[j]) * self.r_activation0[j] * self.input[i]
 
-    def __single_CGD():
+    def __weight_CGD():
         
  
     def train_N(self, input, target, N):
         if target.shape() != self.output_len:
             raise ValueError("Target dimensions do not match output dimensions")    
-        self.feedforward(input)
+        result = self.feedforward(input)
         for i in range(N - 1):
             self.__backprop(target)
             self.__r_pass()
-            self.__single_CGD()
-            print _sum_sq_err(self.feedforward(input), target)
-        return self.feedforward(input)
+            self.__weight_CGD()
+            result - self.feedforward(input)
+            print _sum_sq_err(result, target)
+        return result
