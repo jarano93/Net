@@ -11,3 +11,6 @@ def imgArray(npArray, fName):
 
 def unflat_RGB(flat, vPix, hPix):
     return flat.reshape(vPix, hPix, 3)
+
+def map_01_255(vect):
+    return np.floor(256 * vect)
