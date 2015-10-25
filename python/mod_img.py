@@ -7,14 +7,14 @@ def flat_img(fName):
     return np.asarray(Image.open(fName)).flatten()
 
 def imgArray(npArray, fName):
-    temp = np.array(npArray)
     Image.fromarray(temp).save(fName)
 
-def unflat_RGBA(flat, vPix, hPix):
-    print type(flat)
+def unflat_RGB(flat, vPix, hPix):
     temp = np.array(flat)
-    print type(temp)
     return flat.reshape(vPix, hPix, 4)
 
-def map_01_255(vect):
-    return np.floor(256 * vect)
+def flat_BW(fName):
+    return np.asarray(Image.open(fName))[:,:,0].flatten()
+
+def flat_png(fName):
+    return np.asarray(Image.open(fName))[:,:,0:3].flatten()
