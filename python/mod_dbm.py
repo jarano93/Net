@@ -11,13 +11,13 @@ from numpy.linalg import norm
 class DBMatrix():
 
     def __init__(self, rows, cols, val, fName):
-        self.rows = rows
-        self.cols = cols
+        self.rows = int(rows)
+        self.cols = int(cols)
         self.fName = fName
         self.dbName = fName + '.dbm'
         db = bsddb.hashopen(self.dbName, 'c')
-        for r in range(rows):
-            for c in range(cols):
+        for r in range(self.rows):
+            for c in range(self.cols):
                 i = c * rows + r
                 db['%d'%i] = '%d' % val
         db.sync()
@@ -38,6 +38,17 @@ class DBMatrix():
         db.sync()
         db.close()
 
+    def get_col(self,c):
+        col_vector = np.zeros((self.rows, 1))
+        col = c * self.rows
+        db = bsddb.hashopen(self.dbName, 'r')
+        for r in range(self.rows):
+            i = col + r
+            col_vector[r] = float(db[str(i)])
+        db.sync()
+        db.close()
+        return col_vector
+
     def sum(self, dbmatrix):
         sum = DBMatrix(self.rows, self.cols, 0, self.fName + '_+_' + dbmatrx.fName)
         for r in range(self.rows):
@@ -52,7 +63,14 @@ class DBMatrix():
                 transpose.set(rt,ct, self.get(ct, rt))
         return transpose
 
-    def inverse(self):
+    def neg(self):
+        neg = DBMatrix(self.rows, self.cols, 0, self.fName + '_neg')
+        for r in range(self.rows)
+            for c in range(self.cols):
+                neg.set(r,c, -self.get(r,c))
+        return neg
+
+    def invert(self):
         # assume the matrix is nonsingular AND square
         ls_TOL = 1e-6
         solver = self.pick_linsys_solv()
@@ -62,6 +80,13 @@ class DBMatrix():
             target[c] = 1
             inverse.insert_colvector(solver(target, ls_TOL), c)
         return inverse
+
+    def product_scalar(self, k):
+        product = DBMatrix(self,rows, self.cols, 0, self.fName + '_x_' + str(k))
+        for r in range(self.rows):
+            for c in range(self.cols):
+                product.set(r,c) = k * self.get(r,c)
+        return product
 
     def product_col(self, v):
         product = np.zeros((self.rows, 1))
