@@ -5,6 +5,7 @@ import mod_img as IMG
 import mod_pickle as PKL
 import numpy as np
 # data created using http://gmaps-samples-v3.googlecode.com/svn/trunk/styledmaps/wizard/index.html
+# max array size ~6e7 elems
 # use berkeley database to store weights in memory since too H U E G for RAM
 #   >muh speed tho
 
