@@ -52,14 +52,15 @@ class DBMatrix():
                 transpose.set(rt,ct, self.get(ct, rt))
         return transpose
 
-    def inverse_GS(self):
+    def inverse(self):
         # assume the matrix is nonsingular AND square
-        gs_TOL = 1e-6
+        ls_TOL = 1e-6
+        solver = self.pick_linsys_solv()
         inverse = DBMatrix(self.rows, self.cols, 0, self.fName + '_inv')
         for c in range(self.cols):
             target = np.zeros((self.rows,1))
             target[c] = 1
-            inverse.insert_colvector(self.gauss_seidel_TOL(target, gs_TOL), c)
+            inverse.insert_colvector(solver(target, ls_TOL), c)
         return inverse
 
     def product_col(self, v):
@@ -134,10 +135,24 @@ class DBMatrix():
                 return x1
             x0 = x1
 
+    def nondiag_jacobi_TOL(self, target, TOl):
+        diag = self.diag()
+        x0 = diag * target
+        x1 = x0
+        while True:
+            for r in range(self.rows):
+                sum = 0
+                for c in range(self.cols):
+                    sum += self.get(r,c) * x0[c]
+                x1[r] = x0[r] + target[r] - sum
+        if norm(x1 - x0, np.inf) < TOL:
+            return x1
+        x0 = x1
+
     def gauss_seidel_TOL(self, target, TOL):
         diag = self.diag()
         guess0 = diag * target
-        guess1 = diag * target
+        guess1 = guess0
         while True:
             for r in range(self.rows):
                 sum = 0
@@ -150,3 +165,10 @@ class DBMatrix():
             if norm(guess1 - guess0, np.inf) < TOL:
                 return guess1
             guess0 = guess1
+
+    def pick_linsys_solv(self):
+        diag = self.diag()
+        if 0 in diag:
+            return self.nondiag_jacobi_TOL
+        else:
+            return self.gauss_seidel_TOL
