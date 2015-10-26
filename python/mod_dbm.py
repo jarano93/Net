@@ -54,7 +54,7 @@ class DBMatrix():
 
     def inverse_GS(self):
         # assume the matrix is nonsingular AND square
-        gs_TOL = 1e-4
+        gs_TOL = 1e-6
         inverse = DBMatrix(self.rows, self.cols, 0, self.fName + '_inv')
         for c in range(self.cols):
             target = np.zeros((self.rows,1))
@@ -119,6 +119,21 @@ class DBMatrix():
             diagonal[i] = self.get(i,i)
         return diagonal
 
+    def jacobi_TOL(self, target, TOL):
+        diag = self.diag()
+        x0 = diag * target
+        x1 = x0
+        while True:
+            for r in range(self.rows):
+                sum = 0
+                for c in range(self.cols):
+                    if r != c:
+                        sum += self.get(r,c) * x0[c]
+                x1[r] = (x1[r] - sum) / diag[r]
+            if norm(x1 - x0, np.inf) < TOL:
+                return x1
+            x0 = x1
+
     def gauss_seidel_TOL(self, target, TOL):
         diag = self.diag()
         guess0 = diag * target
@@ -129,10 +144,9 @@ class DBMatrix():
                 for c in range(self.cols):
                     if r > c:
                         sum += self.get(r,c) * guess1[c]
-                    else:
+                    elif r < c:
                         sum += self.get(r,c) * guess0[c]
                     guess1[r] = (target[r] - sum) / diag[r]
-            print guess1
             if norm(guess1 - guess0, np.inf) < TOL:
                 return guess1
             guess0 = guess1
