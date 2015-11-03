@@ -23,37 +23,55 @@ class DBMatrix():
         db.sync()
         db.close()
 
-    def get(self, r, c):
-        i = c * self.rows + r
+    @classmethod
+    def get(matrix, r, c):
+        i = c * matrix.rows + r
         db = bsddb.hashopen(self.dbName, 'r')
         val = float(db[str(i)])
         db.sync()
         db.close()
         return val
 
-    def set(self, r, c, val):
-        i = c * self.rows + r
+    def __getitem__(self, key):
+        """
+            Gets either:
+            1) Individual value given row & col numbers
+            2) Whole col or row given splices & ints
+                NO FANCY SPLICES OR SUBMATRICES
+        """
+        (r,c) = key
+        if type(r) == int && type(c) == int:
+            if r < -1 || self.rows < r || c < -1 || self.cols < c:
+                raise
+        elif type(r) == splice && type(c) == int:
+        elif type(r) == int && type(c) == splice:
+
+    @classmethod
+    def set(matrix, r, c, val):
+        i = c * matrix.rows + r
         db = bsddb.hashopen(self.dbName, 'w')
         db['%d'%i] = '%d' % val
         db.sync()
         db.close()
 
-    def get_col(self,c):
-        col_vector = np.zeros((self.rows, 1))
-        col = c * self.rows
-        db = bsddb.hashopen(self.dbName, 'r')
-        for r in range(self.rows):
+    @classmethod
+    def get_col(matrix,c):
+        col_vector = np.zeros((matrix.rows, 1))
+        col = c * matrix.rows
+        db = bsddb.hashopen(matrix.dbName, 'r')
+        for r in range(matrix.rows):
             i = col + r
             col_vector[r] = float(db[str(i)])
         db.sync()
         db.close()
         return col_vector
 
-    def sum(self, dbmatrix):
-        sum = DBMatrix(self.rows, self.cols, 0, self.fName + '_+_' + dbmatrx.fName)
-        for r in range(self.rows):
-            for c in range(self.cols):
-                sum.set(r,c, self.get(r,c) + dbmatrix.get(r,c))
+    @classmethod
+    def sum(matrix1, matrix2):
+        sum = DBMatrix(matrix1.rows, matrix1.cols, 0, matrix1.fName + '_+_' + matrix2.fName)
+        for r in range(sum.rows):
+            for c in range(sum.cols):
+                sum[r,c] = matrix1[r,c] + matrix2[r,c]
         return sum
 
     def transpose(self):
@@ -123,6 +141,19 @@ class DBMatrix():
                         elem_product += self.get(rt, cct) * matrix.get(rr, c)
                 transproduct.set(rt,c, elem_product)
         return transproduct
+
+    def matrix_division(self, matrix):
+        return 0
+
+    def scalar_division(self, scalar):
+        if scalar == 0:
+            raise ValueError("Cannot Divide By Zero")
+        elif abs(scalar) < 1e-5:
+            print "Exploding Number Warning!"
+        for r in self.rows:
+            for c in self.cols:
+                self.set(r,c, self.get(r,c) / scalar)
+        return self
 
     def insert_colvector(self, colvector, col):
         for r in range(self.rows):
