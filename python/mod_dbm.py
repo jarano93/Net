@@ -172,6 +172,18 @@ class DBMatrix():
         return mul
 
     @classmethod
+    def mul_transpose(matrix1, matrix2):
+        """ Mimics A^T * B """
+        if matrix1.rows != matrix2.rows:
+            raise ValueError("Argument matrices do not have matching inner dimensions")
+        mul_name = matrix1.fName + '_T_' + matrix2.fName + '_mul'
+        mul = DBMatrix(matrix1.cols, matrix2.cols, 0, mul_name):
+        for rt in xrange(matrix1.cols):
+            for c in xrange(matrix2.cols):
+                mul[rt,c] = matrix1[:,rt].T * matrix2[:,c]
+        return mul
+
+    @classmethod
     def div_scalar(matrix, scalar):
         if scalar == 0:
             raise ValueError("Can't divide by zero!")
