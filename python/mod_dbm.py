@@ -7,12 +7,15 @@ from numpy.linalg import norm
 # SOMETIMES YOU WANT SOMETHING SO LARGE YOUR COMPUTER CAN'T HANDLE IT
 # AND SCREW DICTS
 # EXTRA GIRTHY 2-D ARRAYS, BREH
+# NONSPARSE BRUH, NONSPARSE ;_;
+# Reverse Polish Notation now too.
 
 class DBMatrix():
 
     def __init__(self, rows, cols, val, fName):
         self.rows = int(rows)
         self.cols = int(cols)
+        self.shape = (rows, cols)
         self.fName = fName
         self.dbName = fName + '.dbm'
         db = bsddb.hashopen(self.dbName, 'c')
@@ -23,15 +26,6 @@ class DBMatrix():
         db.sync()
         db.close()
 
-    @classmethod
-    def get(matrix, r, c):
-        i = c * matrix.rows + r
-        db = bsddb.hashopen(self.dbName, 'r')
-        val = float(db[str(i)])
-        db.sync()
-        db.close()
-        return val
-
     def __getitem__(self, key):
         """
             Gets either:
@@ -40,39 +34,209 @@ class DBMatrix():
                 NO FANCY SPLICES OR SUBMATRICES
         """
         (r,c) = key
+        db = bsddb.hashopen(self.dbName, 'r')
         if type(r) == int && type(c) == int:
             if r < -1 || self.rows < r || c < -1 || self.cols < c:
-                raise
-        elif type(r) == splice && type(c) == int:
+                db.sync()
+                db.close()
+                raise IndexError("index out of bounds")
+            i = c * self.rows + r
+            val = float(db[str(i)])
+            return val
+        elif type(r) == splice && type(c) == int: # get a whole column
+            if c < -1 || self.cols - 1  < c:
+                db.sync()
+                db.close()
+                raise IndexError("column index out of bounds")
+            col_vector = np.zeros((self.rows, 1))
+            col = c * self.rows
+            for i in xrange(self.rows):
+                row_index = col + i
+                col_vector[i] = float(db[str(row_index)])
+            return col_vector
         elif type(r) == int && type(c) == splice:
+            if r < -1 || self.rows - 1 < r:
+                db.sync()
+                db.close()
+                raise IndexError("row index out of bounds")
+            row_vector = np.zeros((1, self.cols))
+            for j in xrange(self.cols):
+                col_index = (j * self.rows) + r
+                row_vector[1, j] = float(db[str(col_index)]_
+            return row_vector
+        db.sync()
+        db.close()
 
-    @classmethod
-    def set(matrix, r, c, val):
-        i = c * matrix.rows + r
-        db = bsddb.hashopen(self.dbName, 'w')
-        db['%d'%i] = '%d' % val
+    def __setitem__(self, key, val):
+        """
+            Sets either:
+            1) Individual value given row & col numbers
+            2) Whole col or row given splices & ints
+                NO FANCY SPLICES OR SUBMATRICES
+        """
+        (r,c) = key
+        db = bsddb,hasopen(self.dbName, 'w')
+        if type(r) == int && type(c) == int:
+            if r < -1 || self.rows < r || c < -1 || self.cols < c:
+                db.sync()
+                db.close()
+                raise IndexError("index out of bounds")
+            i = c * matrix.rows + r
+            db['%d'%i] = '%d' % val
+        elif type(r) == splice && type(c) == int:
+            if c < -1 || self.cols - 1  < c:
+                db.sync()
+                db.close()
+                raise IndexError("column index out of bounds")
+            if len(val) != self.rows:
+                db.sync()
+                db.close()
+                raise ValueError("New number of rows does not match original")
+            col = c * self.rows
+            for i in xrange(self.rows):
+                row_index = col + i
+                db['%d'%row_index] = '%d' % val[i]
+        elif type(r) == int && type(c) == splice:
+            if r < -1 || self.rows - 1 < r:
+                db.sync()
+                db.close()
+                raise IndexError("row index out of bounds")
+            if len(val) != self.cols:
+                db.sync()
+                db.close()
+                raise ValueError("New number of columns does not match original")
+            for j in xrange(self.cols):
+                col_index = (j * self.rows) + r
+                db['%d'%col_index] = '%d' % val[j]
         db.sync()
         db.close()
 
     @classmethod
-    def get_col(matrix,c):
-        col_vector = np.zeros((matrix.rows, 1))
-        col = c * matrix.rows
-        db = bsddb.hashopen(matrix.dbName, 'r')
-        for r in range(matrix.rows):
-            i = col + r
-            col_vector[r] = float(db[str(i)])
-        db.sync()
-        db.close()
-        return col_vector
+    def add(matrix1, matrix2):
+        if matrix1.shape != matrix2.shape:
+            raise ValueError("Argument matrices do not have matching shape")
+        add_name = matrix1.fName + '_' + matrix2.fName + '_add'
+        add = DBMatrix(matrix1.rows, matrix1.cols, 0, add_name)
+        for r in xrange(add.rows):
+            for c in xrange(add.cols):
+                add[r,c] = matrix1[r,c] + matrix2[r,c]
+        return add
 
     @classmethod
-    def sum(matrix1, matrix2):
-        sum = DBMatrix(matrix1.rows, matrix1.cols, 0, matrix1.fName + '_+_' + matrix2.fName)
-        for r in range(sum.rows):
-            for c in range(sum.cols):
-                sum[r,c] = matrix1[r,c] + matrix2[r,c]
-        return sum
+    def neg(matrix):
+        neg_name = matrix.fName + '_neg'
+        neg = DBMatrix(matrix.rows, matrix.cols, 0, neg_name)
+        for r in xrange(self.rows):
+            for c in xrange(self.cols):
+                neg[r,c] = -1 * matrix[r,c]
+        return neg
+
+    @classmethod
+    def sub(matrix1, matrix2):
+        if matrix1.shape != matrix2.shape:
+            raise ValueError("Argument matrices do not have matching shape")
+        sub_name = matrix1.fName + '_' + matrix2.fName + '_sub'
+        sub = DBMatrix(matrix1.rows, matrix1.cols, 0, sub_name)
+        for r in xrange(sub.rows):
+            for c in xrange(sub.cols):
+                sub[r,c] = matrix1[r,c] - matrix2[r,c]
+        return sub
+
+    @classmethod
+    def mul_scalar(matrix, scalar):
+        mul_name = matrix.fName + '_' str(scalar) + '_mul'
+        mul = DBMatrix(matrix.rows, matrix.cols, 0, mul_name)
+        for r in xrange(matrix.rows):
+            for c in xrange(matrix.cols):
+                mul[r,c] = scalar * matrix[r,c]
+        return mul
+
+    @classmethod
+    def mul_vector(matrix, vector):
+        if matrix.rows != len(vector):
+            raise ValueError("Arguments do not have matching inner dimensions")
+        product = np.zeros((matrix.rows, 1))
+        for r in xrange(matrix.rows):
+            product[r] = matrix[r,:] * vector
+        return product
+
+    @classmethod
+    def mul_matrix(matrix1, matrix2):
+        if matrix1.cols != matrix2.rows:
+            raise ValueError("Argument matrices do not have matching inner dimensions")
+        mul_name = matrix1.fName + '_' + matrix2.fName + '_mul'
+        mul = DBMatrix(matrix1.rows, matrix2.cols, 0, mul_name)
+        for r in xrange(matrix1.rows):
+            for c in xrange(matrx2.cols):
+                mul[r,c] = matrix1[r,:] * matrix2[:,c]
+        return mul
+
+    @classmethod
+    def div_scalar(matrix, scalar):
+        if scalar == 0:
+            raise ValueError("Can't divide by zero!")
+        div_name = matrix.fName + '_' + str(scalar) + '_div'
+        div = DBMatrix(matrix.rows, matrix.cols, 0, div_name
+        for r in xrange(matrix.rows):
+            for c in xrange(matrix.cols):
+                div[r,c] = matrix[r,c] / scalar
+        return div
+
+    @classmethod
+    def div_matrix(matrix1, matrix2):
+        """
+            Mimics matrix1 * (matrix2 ^ -1) = X by solving the linear system matrix1 = X * matrix2
+        """
+        if matrix1.cols != matrix2.rows:
+            raise ValueError("Arguments do not have matching inner dimensions")
+        ls_TOL = 1e-5
+        solver = matrix2.linsys_solv()
+        div_name = matrix1.fName + '_' + matrix2.fName + '_div'
+        div = DBMatrix(matrix1.rows, matrix1.cols, 0, div_name)
+        for c in range(matrix1.cols):
+            div[:,c] = solver(matrix1[:,c], ls_TOL)
+        return div
+
+    def __add__(self, other):
+        return DBMatrix.add(self, other)
+
+    def __radd__(self, other):
+        return DBMatrix.add(self, other)
+
+    def __iadd__(self, other):
+        return DBMatrix.add(self, other)
+
+    def __sub__(self, other):
+        return DBMatrix.sub(self, other)
+
+    def __rsub__(self, other):
+        return DBMatrix.sub(other, self)
+
+    def __isub__(self, other):
+        return DBMatrix.sub(self, other)
+
+    def __mul__(self, other):
+        if type(other) == int || type(other) == float;
+            return DBMatrix.mul_scalar(self, other)
+        elif type(other) = np.ndarray:
+            return DBMatrix.mul_vector(self, other)
+        elif type(other) == DBMatrix:
+            return DBMatrix.mul_matrix(self, other)
+
+    def __rmul__(self, other):
+        return other.__mul__(self)
+
+    def __imul__(self, other):
+        return self.__mul__(other)
+
+    def __div__(self, other):
+        if type(other) == int || type(other) == float:
+            return DBMatrix.div_scalar(matrix, other)
+        elif type(other) == DBMatrix:
+            return DBMatrix.div_matrix(matrix, other)
+
+    def __idiv__(self, other):
+        return self.__div__(other)
 
     def transpose(self):
         transpose = DBMatrix(self.cols, self.rows, 0, self.fName + '_T')
@@ -81,99 +245,10 @@ class DBMatrix():
                 transpose.set(rt,ct, self.get(ct, rt))
         return transpose
 
-    def neg(self):
-        neg = DBMatrix(self.rows, self.cols, 0, self.fName + '_neg')
-        for r in range(self.rows)
-            for c in range(self.cols):
-                neg.set(r,c, -self.get(r,c))
-        return neg
-
-    def invert(self):
-        # assume the matrix is nonsingular AND square
-        ls_TOL = 1e-6
-        solver = self.pick_linsys_solv()
-        inverse = DBMatrix(self.rows, self.cols, 0, self.fName + '_inv')
-        for c in range(self.cols):
-            target = np.zeros((self.rows,1))
-            target[c] = 1
-            inverse.insert_colvector(solver(target, ls_TOL), c)
-        return inverse
-
-    def product_scalar(self, k):
-        product = DBMatrix(self,rows, self.cols, 0, self.fName + '_x_' + str(k))
-        for r in range(self.rows):
-            for c in range(self.cols):
-                product.set(r,c) = k * self.get(r,c)
-        return product
-
-    def product_col(self, v):
-        product = np.zeros((self.rows, 1))
-        for r in range(self.rows):
-            for c in range(self.cols):
-                product[r] += self.get(r,c) * v[r]
-        return product
-
-    def transproduct_col(self, v):
-        transproduct = np.zeros((self.rows, 1))
-        for c in range(self.cols):
-            for r in range(self.rows):
-                transproduct[c] += self.get(r,c) * v[c]
-        return transproduct
-
-    def product_matrix(self, matrix):
-        product = DBMatrix(self.rows, matrix.cols, 0, self.fName + '_x_' + matrix.fName)
-        for r in range(self.rows):
-            for c in range(matrix.cols):
-                elem_product = 0
-                for rr in range(matrix.rows):
-                    for cc in range(self.cols):
-                        elem_product += self.get(r, cc) * matrix.get(rr, c)
-                product.set(r, c, elem_product)
-        return product
-
-    def transproduct_matrix(self, matrix):
-        transproduct = DBMatrix(self.cols, matrix.cols, 0, self.fName + '_Tx_' + matrix.fName)
-        for rt in range(self.cols):
-            for c in range(matrix.cols):
-                elem_product = 0
-                for rr in range(matrix.rows):
-                    for cct in range(self.rows):
-                        elem_product += self.get(rt, cct) * matrix.get(rr, c)
-                transproduct.set(rt,c, elem_product)
-        return transproduct
-
-    def matrix_division(self, matrix):
-        return 0
-
-    def scalar_division(self, scalar):
-        if scalar == 0:
-            raise ValueError("Cannot Divide By Zero")
-        elif abs(scalar) < 1e-5:
-            print "Exploding Number Warning!"
-        for r in self.rows:
-            for c in self.cols:
-                self.set(r,c, self.get(r,c) / scalar)
-        return self
-
-    def insert_colvector(self, colvector, col):
-        for r in range(self.rows):
-            self.set(r, col, colvector[r])
-
-    def inf_norm_difference(self, matrix):
-        inf_norm = 0
-        for r in range(self.rows):
-            max_abs = 0
-            for c in range(self.cols):
-                abs_dif = abs(self.get(r,c) - matrix.get(r,c))
-                if abs_dif > max_abs:
-                    max_abs = abs_dif
-            inf_norm += max_abs
-        return inf_norm
-
     def diag(self):
         diagonal = np.zeros((self.rows, 1))
         for i in range(self.rows):
-            diagonal[i] = self.get(i,i)
+            diagonal[i] = self[i,i]
         return diagonal
 
     def jacobi_TOL(self, target, TOL):
@@ -222,9 +297,12 @@ class DBMatrix():
                 return guess1
             guess0 = guess1
 
-    def pick_linsys_solv(self):
-        diag = self.diag()
-        if 0 in diag:
-            return self.nondiag_jacobi_TOL
+    def linsys_solv(self):
+        if self.rows == self.cols:
+            diag = self.diag()
+            if 0 in diag:
+                return self.nondiag_jacobi_TOL
+            else:
+                return self.gauss_seidel_TOL
         else:
-            return self.gauss_seidel_TOL
+            return self.nondiag_jacobi_TOL
