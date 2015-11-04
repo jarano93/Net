@@ -1,5 +1,13 @@
 #!usr/bin/python
 
+from mod_dbm import DBMatrix
+import time
+
+def time_dims(rows, cols):
+    start = int(time.time())
+    DBMatrix(rows, cols, 0, 'test')
+    return int(time.time()) - start
+    
 class Ayy():
     
     def __getitem__(self, key):

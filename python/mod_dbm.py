@@ -35,16 +35,16 @@ class DBMatrix():
         """
         (r,c) = key
         db = bsddb.hashopen(self.dbName, 'r')
-        if type(r) == int && type(c) == int:
-            if r < -1 || self.rows < r || c < -1 || self.cols < c:
+        if type(r) == int and type(c) == int:
+            if r < -1 or self.rows < r or c < -1 or self.cols < c:
                 db.sync()
                 db.close()
                 raise IndexError("index out of bounds")
             i = c * self.rows + r
             val = float(db[str(i)])
             return val
-        elif type(r) == splice && type(c) == int: # get a whole column
-            if c < -1 || self.cols - 1  < c:
+        elif type(r) == splice and type(c) == int: # get a whole column
+            if c < -1 or self.cols - 1  < c:
                 db.sync()
                 db.close()
                 raise IndexError("column index out of bounds")
@@ -54,15 +54,15 @@ class DBMatrix():
                 row_index = col + i
                 col_vector[i] = float(db[str(row_index)])
             return col_vector
-        elif type(r) == int && type(c) == splice:
-            if r < -1 || self.rows - 1 < r:
+        elif type(r) == int and type(c) == splice:
+            if r < -1 or self.rows - 1 < r:
                 db.sync()
                 db.close()
                 raise IndexError("row index out of bounds")
             row_vector = np.zeros((1, self.cols))
             for j in xrange(self.cols):
                 col_index = (j * self.rows) + r
-                row_vector[1, j] = float(db[str(col_index)]_
+                row_vector[1, j] = float(db[str(col_index)])
             return row_vector
         db.sync()
         db.close()
@@ -76,15 +76,15 @@ class DBMatrix():
         """
         (r,c) = key
         db = bsddb,hasopen(self.dbName, 'w')
-        if type(r) == int && type(c) == int:
-            if r < -1 || self.rows < r || c < -1 || self.cols < c:
+        if type(r) == int and type(c) == int:
+            if r < -1 or self.rows < r or c < -1 or self.cols < c:
                 db.sync()
                 db.close()
                 raise IndexError("index out of bounds")
             i = c * matrix.rows + r
             db['%d'%i] = '%d' % val
-        elif type(r) == splice && type(c) == int:
-            if c < -1 || self.cols - 1  < c:
+        elif type(r) == splice and type(c) == int:
+            if c < -1 or self.cols - 1  < c:
                 db.sync()
                 db.close()
                 raise IndexError("column index out of bounds")
@@ -96,8 +96,8 @@ class DBMatrix():
             for i in xrange(self.rows):
                 row_index = col + i
                 db['%d'%row_index] = '%d' % val[i]
-        elif type(r) == int && type(c) == splice:
-            if r < -1 || self.rows - 1 < r:
+        elif type(r) == int and type(c) == splice:
+            if r < -1 or self.rows - 1 < r:
                 db.sync()
                 db.close()
                 raise IndexError("row index out of bounds")
@@ -144,7 +144,7 @@ class DBMatrix():
 
     @classmethod
     def mul_scalar(matrix, scalar):
-        mul_name = matrix.fName + '_' str(scalar) + '_mul'
+        mul_name = matrix.fName + '_' + str(scalar) + '_mul'
         mul = DBMatrix(matrix.rows, matrix.cols, 0, mul_name)
         for r in xrange(matrix.rows):
             for c in xrange(matrix.cols):
@@ -177,7 +177,7 @@ class DBMatrix():
         if matrix1.rows != matrix2.rows:
             raise ValueError("Argument matrices do not have matching inner dimensions")
         mul_name = matrix1.fName + '_T_' + matrix2.fName + '_mul'
-        mul = DBMatrix(matrix1.cols, matrix2.cols, 0, mul_name):
+        mul = DBMatrix(matrix1.cols, matrix2.cols, 0, mul_name)
         for rt in xrange(matrix1.cols):
             for c in xrange(matrix2.cols):
                 mul[rt,c] = matrix1[:,rt].T * matrix2[:,c]
@@ -188,7 +188,7 @@ class DBMatrix():
         if scalar == 0:
             raise ValueError("Can't divide by zero!")
         div_name = matrix.fName + '_' + str(scalar) + '_div'
-        div = DBMatrix(matrix.rows, matrix.cols, 0, div_name
+        div = DBMatrix(matrix.rows, matrix.cols, 0, div_name)
         for r in xrange(matrix.rows):
             for c in xrange(matrix.cols):
                 div[r,c] = matrix[r,c] / scalar
@@ -228,9 +228,9 @@ class DBMatrix():
         return DBMatrix.sub(self, other)
 
     def __mul__(self, other):
-        if type(other) == int || type(other) == float;
+        if type(other) == int or type(other) == float:
             return DBMatrix.mul_scalar(self, other)
-        elif type(other) = np.ndarray:
+        elif type(other) == np.ndarray:
             return DBMatrix.mul_vector(self, other)
         elif type(other) == DBMatrix:
             return DBMatrix.mul_matrix(self, other)
@@ -242,7 +242,7 @@ class DBMatrix():
         return self.__mul__(other)
 
     def __div__(self, other):
-        if type(other) == int || type(other) == float:
+        if type(other) == int or type(other) == float:
             return DBMatrix.div_scalar(matrix, other)
         elif type(other) == DBMatrix:
             return DBMatrix.div_matrix(matrix, other)
