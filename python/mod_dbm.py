@@ -250,6 +250,21 @@ class DBMatrix():
     def __idiv__(self, other):
         return self.__div__(other)
 
+    def __mod__(self, other):
+        if type(other) != DBMatrix:
+            raise ValueError("Both arguments must be DBMatrices")
+        return DBMatrix.mul_transpose(self, other)
+
+    def __rmod__(self, other):
+        if type(other) != DBMatrix:
+            raise ValueError("Both arguments must be DBMatrices")
+        return DBMatrix.mul_transpose(other, self)
+
+    def __imod__(self, other):
+        if type(other) != DBMatrix:
+            raise ValueError("Both arguments must be DBMatrices")
+        return DBMatrix.mul_transpose(self, other)
+
     def transpose(self):
         transpose = DBMatrix(self.cols, self.rows, 0, self.fName + '_T')
         for rt in range(self.cols):
