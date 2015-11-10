@@ -293,7 +293,7 @@ class DBMatrix():
                 return x1
             x0 = x1
 
-    def nondiag_jacobi_TOL(self, target, TOl):
+    def nondiag_jacobi_TOL(self, target, TOL):
         diag = self.diag()
         x0 = diag * target
         x1 = x0

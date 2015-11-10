@@ -8,31 +8,13 @@ class Sparse():
         self.shape = (rows, cols)
         self.nozero = {}
         self.threshold = 1e-3
-        
+
     def transpose(self):
         transpose = Sparse(self.cols, self.rows):
         for coord in self.nonzero():
             coordT = (coord[1], coord[0])
             transpose.nonzero[coordT] = self.nonzero[coord]
         return transpose
-
-    @classmethod
-    def add(matrix1, matrix2):
-        """ matrix1 + matrix2 """
-        if matrix1.shape != matrix2.shape:
-            raise ValueError("Dimensions do not match")
-        sum = Sparse(matrix1.rows, matrix2.cols)
-        sum.nonzero = matrix1.nonzero
-        for key in matrix2.nonzero:
-            if key not in matrix1.nonzero:
-                sum.nonzero[key] = matrix2.nonzero[key]
-            else:
-                val = matrix1.nonzero[key] + matrix2.nonzero[key]
-                if abs(val) > sum.threshold:
-                    sum.nonzero[key] = val
-                else:
-                    del sum.nonzero[key]
-        return sum
 
     @classmethod
     def sub(matrix1, matrix2):
@@ -51,7 +33,7 @@ class Sparse():
         return dif
 
     @classmethod
-    def scalar_product(matrix, scalar):
+    def mul_scalar(matrix, scalar):
         product = Sparse(matrix.rows, matrix.cols)
         for r in product.rows:
             for c in product.rows:
@@ -61,42 +43,72 @@ class Sparse():
         return product
 
     @classmethod
-    def vector_product(matrix, vector):
+    def mul_vector(matrix, vector):
         if len(vector) != matrix.cols:
             raise ValueError("Inner dimensions do not match")
         product = Sparse(1, matrix.cols)
-        for r in matrix.rows:
-            sum = 0
-            for c in matrix.cols:
-                sum += matrix[r,c] * vector[c]
-            if abs(sum) > product.threshold:
-                product[r,1] = sum
+        for key in matrix.nonzero:
+            (r,c) = key
+            val = matrix[key] * vector[c] 
+            if abs(val) < product.threshold:
+                continue
+            if c not in product.nonzero:
+                product[c] = val
+            else:
+                product[c] += val
+        for key in product.nonzero:
+            if abs(product[key]) < product.threshold:
+                del product.nonzero[key]
         return product
 
     @classmethod
-    def matrix_product(matrix1, matrix2):
+    def mul_matrix(matrix1, matrix2):
         if matrix1.cols != matrix2.rows:
             raise ValueError("Inner dimensions do not match")
         product = Sparse(matrix1.rows, matrix2.cols)
-        for r in matrix1.rows
+        for key1 in matrix1.nonzero:
+            for key2 in matrix2.nonzero:
+                (r1,c1) = key1
+                (r2,c2) = key2
+                if c1 == r2:
+                    val = matrix1[r1,c1] * matrix2[r2,c2]
+                    if abs(val) < product.threshold:
+                        continue
+                    if (r1,c2) not in product.nonzero:
+                        product[r1,c2] = val
+                    else:
+                        product[r1,c2] += val
+        for key in product.nonzero:
+            if abs(product[key]) < product.threshold:
+                del product.nonzero[key]
+        return product
 
     @classmethod
-    def handle_mul(matrix, arg, reverse=False):
-        if arg.shape != None:
-            if reverse:
-                return Sparse.matrix_product(arg, matrix)
-            else:
-                return Sparse.matrix_product(matrix, arg)
-        try:
-            len(arg)
-            return Sparse.vector_proudct(matrix, arg)
-        except TypeError as e:
-            return Sparse.scalar_product(matrix,arg)
+    def mul_transpose(matrix1, matrix2):
 
-    def __len__(self):
-        return self.rows * self.cols
+    @classmethod
+    def div_scalar(matrix, scalar):
+        if scalar == 0:
+            raise ValueError("Can't divide by zero!")
+        div = Sparse(*matrix.shape)
+        for key in div.nonzero:
+            val = matrix[key] / scalar
+            if abs(val) > div.threshold:
+                div.nonzero[key] = val
+        return div
 
-    def __getitem__(self, key)
+    @classmethod
+    def div_matrix(matrix1, matrix2):
+        """
+            Mimics matrix1 * (matrix2 ^ -1) = X by solving the linear system matrix1 = X * matrix2
+        """
+        if matrix1.cols != matrix2.rows:
+            raise ValueError("Arguments do not have matching inner dimensions")
+        ls_TOL = 1e-5
+        div = Sparse(*matrix1.shape)
+        
+
+    def __getitem__(self, key):
         if type(key) ==  tuple
             if len(key) != 2:
                 raise ValueError("Key must have two elements")
@@ -251,11 +263,30 @@ class Sparse():
         return Sparse.sub(self, matrix)
 
     def __mul__(self, arg):
-        return Sparse.handle_mul(self,arg)
+        try:
+            arg_shape = arg.shape
+            if len(arg_shape) == 1:
+                return Sparse.mul_vector(self, arg)
+            elif len(arg_shape) == 2:
+                (r,c) = arg_shape
+                if c == 1:
+                    return Sparse.mul_vector(self, arg)
+                else:
+                    return Sparse.mul_matrix(self, arg)
+            else:
+                raise ValueError("Arguments have too high dimension")
+        except AttributeError:
+            if type(other) == int or type(other) == float:
+                return Sparse.mul_scalar(self, other)
+            else:
+                raise TypeError("Argument of wrong type")
     
     def __rmul__(self, arg):
-        return Sparse.handle_mul(
+        return arg.__mul__(self)
        
-    # __imul__
+    def __imul__(self, arg):
+        return self.__mul__(arg)
+
     # __neg__
-    # __invert__
+    # __div__
+    # __mod__
