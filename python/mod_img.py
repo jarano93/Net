@@ -3,8 +3,18 @@
 from PIL import Image
 import numpy as np
 
-def arrayImg(fName):
-    return np.asarray(Image.open(fName))
+def flat_img(fName):
+    return np.asarray(Image.open(fName)).flatten()
 
 def imgArray(npArray, fName):
-    Image.fromarray(npArray).save(fName)
+    Image.fromarray(temp).save(fName)
+
+def unflat_RGB(flat, vPix, hPix):
+    temp = np.array(flat)
+    return flat.reshape(vPix, hPix, 4)
+
+def flat_BW(fName):
+    return np.asarray(Image.open(fName))[:,:,0].flatten()
+
+def flat_png(fName):
+    return np.asarray(Image.open(fName))[:,:,0:3].flatten()
