@@ -15,35 +15,40 @@ class DictMatrix():
         self.shape = (self.rows, self.cols)
         self.row_dict = {}
         if default_val == 0:
-            for i in xrange(self.rows):
-                self.row_dict[i] = np.zeros(self.cols)
+            for r in xrange(self.rows):
+                self.row_dict[r] = np.zeros(self.cols)
         elif default_val == 1:
-            self.row_dict[i] = np.ones(self.cols)
+            for r in xrange(self.rows):
+                self.row_dict[r] = np.ones(self.cols)
         elif type(default_val) == int or type(default_val) == float:
-            self.row_dict[i] = default_val * np.ones(self.cols)
+            for r in xrange(self.rows):
+                self.row_dict[r] = default_val * np.ones(self.cols)
         else:
             raise TypeError("Matrix must be initialized with ints or floats")
+
+    def __repr__(self):
+        return str(self.rows) + "x" + str(self.cols) + " DictMatrix"
 
     def __getitem__(self, key):
         """
             Gets either:
             1) Individual value given row & col numbers
-            2) Whole col or row given splices & ints
+            2) Whole col or row given slices & ints
                 NO FANCY SPLICES OR SUBMATRICES
         """
         (r,c) = key
         if type(r) == int and type(c) == int:
             if r < -1 or self.rows < r or c < -1 or self.cols < c:
                 raise IndexError("Index out of bounds")
-            return self.row_dict[r][c]
-        elif type(r) == splice and type(c) == int:
+            return self.row_dict[r][0,c] # add in 0 so matrix stays cool
+        elif type(r) == slice and type(c) == int:
             if c < -1 or self.cols < c:
                 raise IndexError("Index out of bounds")
-            colvector = np.zeros((self.rows, 1))
-            for row in len(colvector):
-                colvector[row] = self.row_dict[row][c]
+            colvector = np.matrix(np.zeros((self.rows, 1)))
+            for row in xrange(self.rows):
+                colvector[row] = self.row_dict[row][0,c] # add in 0 so matrix stays cool
             return colvector
-        elif type(r) == int and type(c) == splice:
+        elif type(r) == int and type(c) == slice:
             if r < -1 or self.rows < r:
                 raise IndexError("Index out of bounds")
             return self.row_dict[r]
@@ -52,30 +57,30 @@ class DictMatrix():
         """
             Sets either:
             1) Individual value given row & col numbers
-            2) Whole col or row given splices & ints
+            2) Whole col or row given slices & ints
                 NO FANCY SPLICES OR SUBMATRICES
         """
         (r,c) = key
         if type(r) == int and type(c) == int:
             if r < -1 or self.rows < r or c < -1 or self.cols < c:
                 raise IndexError("Index out of bounds")
-            self.row_dict[r][c] = val
-        elif type(r) == splice and type(c) == int:
+            self.row_dict[r][0,c] = float(val)
+        elif type(r) == slice and type(c) == int:
             if c < -1 or self.cols < c:
                 raise IndexError("Index out of bounds")
             if len(val) != self.rows:
                 raise ValueError("Cannot set: innapropriate number of elements")
             for row in xrange(self.rows):
-                self.row_dict[row][c] = val[row]
-        elif type(r) == int and type(c) == splice:
+                self.row_dict[row][0,c] = val[row] # add in 0 so matrix stays cool
+        elif type(r) == int and type(c) == slice:
             if r < -1 or self.rows < r:
                 raise IndexError("Index out of bounds")
             if len(val) != self.rows:
                 raise ValueError("Cannot set: innapropriate number of elements")
-            self.row_dict[r] = val
+            self.row_dict[r] = np.matrix(val)
  
     @classmethod
-    def add(matrix1, matrix2):
+    def add(cls, matrix1, matrix2):
         if matrix1.shape != matrix2.shape:
             raise ValueError("Arguments need matching dimensions")
         result = DictMatrix(*matrix1.shape)
@@ -84,7 +89,7 @@ class DictMatrix():
         return result
 
     @classmethod
-    def sub(matrix1, matrix2):
+    def sub(cls, matrix1, matrix2):
         if matrix1.shape != matrix2.shape:
             raise ValueError("Arguments need matching dimensions")
         result = DictMatrix(*matrix1.shape)
@@ -93,30 +98,30 @@ class DictMatrix():
         return result
 
     @classmethod
-    def neg(matrix):
+    def neg(cls, matrix):
         result = DictMatrix(*matrix.shape)
         for r in xrange(matrix.rows):
             result[r,:] = -matrix[r,:]
         return result
 
     @classmethod
-    def mul(matrix, arg):
+    def mul(cls, matrix, arg):
+        if isinstance(arg, DictMatrix):
+            return DictMatrix.mul_matrix(matrix, arg)
         if type(arg) == int or type(arg) == float:
-             return DictMatrix.mul_scalar(matrix, arg)
+            return DictMatrix.mul_scalar(matrix, arg)
         elif type(arg) == np.ndarray:
             return DictMatrix.mul_vector(matrix, arg)
-        elif type(arg) == DictMatrix:
-            return DictMatrix.mul_matrix(matrix, arg)
 
     @classmethod
-    def mul_scalar(matrix, scalar):
+    def mul_scalar(cls, matrix, scalar):
         result = DictMatrix(*matrix.shape)
         for r in xrange(matrix.rows):
             result[r,:] = scalar * matrix[r,:]
         return result
 
     @classmethod
-    def mul_colvector(matrix, colvector):
+    def mul_colvector(cls, matrix, colvector):
         if len(colvector) != matrix.cols:
             raise ValueError("Arguments need matching inner dimensions")
         result = np.zeros((matrix.rows, 1))
@@ -125,7 +130,7 @@ class DictMatrix():
         return result
 
     @classmethod
-    def mul_matrix(matrix1, matrix2):
+    def mul_matrix(cls, matrix1, matrix2):
         if matrix1.cols != matrix2.rows:
             raise ValueError("Arguments need matching inner dimensions")
         result = DictMatrix(matrix1.rows, matrix2.cols)
@@ -136,33 +141,33 @@ class DictMatrix():
         return result
 
     @classmethod
-    def mul_transpose(matrix, transpose):
-        if matrix1.cols != transpose.cols:
-            raise ValueError("Arguments need matching column size")
-        result = DictMatrix(matrix1.rows, transpose.rows)
+    def mul_transpose(cls, matrix, transpose):
+        if matrix.cols != transpose.cols:
+            raise ValueError("Arguments need matching number of columns")
+        result = DictMatrix(matrix.rows, transpose.rows)
         for r in xrange(result.rows):
             for c in xrange(result.cols):
-                result[r,c] = matrix[r,:] * transpose[c,:]
+                result[r,c] = matrix[r,:] * transpose[c,:].T
         return result
 
     @classmethod
-    def div(matrix, arg):
-        if type(arg) == int or type(arg) == float:
-            return DictMatrix.div_scalar(matrix, arg)
-        elif type(arg) == DictMatrix:
+    def div(cls, matrix, arg):
+       if isinstance(arg, DictMatrix):
             return DictMatrix.div_matrix(matrix, arg)
-
+       elif type(arg) == int or type(arg) == float:
+            return DictMatrix.div_scalar(matrix, arg)
+ 
     @classmethod
-    def div_scalar(matrix, scalar):
+    def div_scalar(cls, matrix, scalar):
         if scalar == 0:
             raise ValueError("Cannot divide by zero")
         result = DictMatrix(*matrix.shape)
-        for r in xrange(results.rows):
+        for r in xrange(result.rows):
             result[r,:] = matrix[r,:] / scalar
         return result
 
     @classmethod
-    def div_matrix(matrix1, matrix2):
+    def div_matrix(cls, matrix1, matrix2):
         """
             Mimics matrix1 * (matrix2 ^ -1) = X by solving the linear system matrix1 = X * matrix2
         """
@@ -209,7 +214,7 @@ class DictMatrix():
         return DictMatrix.div(self, arg)
 
     def __rdiv__(self, arg):
-        if type(arg) != DictMatrix:
+        if not isinstance(arg, DictMatrix):
             raise TypeError("Leading argument must be a DictMatrix")
         return DictMatrix.div_matrix(arg, self)
 
@@ -218,17 +223,17 @@ class DictMatrix():
         return self
 
     def __mod__(self, arg):
-        if type(other) != DictMatrix:
+        if not isinstance(arg, DictMatrix):
             raise TypeError("Both arguments must be DictMatrices")
         return DictMatrix.mul_transpose(self, arg)
 
     def __rmod__(self, arg):
-        if type(arg) != DictMatrix:
+        if not isinstance(arg, DictMatrix):
             raise TypeError("Both arguments must be DictMatrices")
         return DictMatrix.mul_transpose(arg, self)
 
     def __imod__(self, arg):
-        if type(arg) != DictMatrix:
+        if not isinstance(arg, DictMatrix):
             raise TypeError("Both arguments must be DictMatrices")
         self = DictMatrix.mul_transpose(self, arg)
         return self
@@ -239,10 +244,10 @@ class DictMatrix():
         result = np.zeros((self.rows, 1))
         for i in xrange(self.rows):
             result[i] = self[i,i]
-        return result
+        return np.matrix(result)
 
     def transpose(self):
-        result = DBMatrix(self.cols, self.rows):
+        result = DictMatrix(self.cols, self.rows)
         for r in xrange(self.rows):
             for c in xrange(self.cols):
                 result[r,c] = self[c,r]
@@ -253,39 +258,39 @@ class DictMatrix():
         x1 = x0
         while True:
             for r in xrange(self.rows):
-                sum = 0
-                row = self[r,:]
+                sum_val = 0
+                row = np.array(self[r,:])
                 for c in xrange(self.cols):
-                    sum += row[c] * x0[c]
-                x1[r] = x0[r] + target[r] - sum
-            if norm(x1 - x0, np.inf0 < TOL:
+                    sum_val += row[c] * x0[c]
+                x1[r] = x0[r] + target[r] - sum_val
+            if norm(x1 - x0, np.inf) < TOL:
                 return x1
             x0 = x1
 
     def gauss_seidel_TOL(self, target, TOL):
         diagonal = self.diag()
-        x0 = diagonal * target
+        x0 = np.matrix(np.array(diagonal) * np.array(target))
         x1 = x0
         while True:
             for r in xrange(self.rows):
-                sum = 0
-                row = self[r,:]
+                sum_val = 0
+                row = np.array(self[r,:])
                 for c in xrange(self.cols):
                     if r > c:
-                        sum += row[c] * x1[c]
+                        sum_val += row[c] * x1[c]
                     elif r < c:
-                        sum += row[c] * x0[c]
-                    x1[r] = (target[r] - sum) / diag[r]
+                        sum_val += row[c] * x0[c]
+                    x1[r] = (target[r] - sum_val) / diag[r]
             if norm(x1 - x0, np.inf) < TOL:
                 return x1
             x0 = x1
 
     def get_solver(self):
-        if self.rows == self.cols:
+        try:
             diagonal = self.diag()
             if 0 in diagonal:
                 return self.nondiag_jacobi_TOL
             else:
                 return self.gauss_seidel_TOL
-        else:
+        except ValueError:
             return self.nondiag_jacobi_TOL
