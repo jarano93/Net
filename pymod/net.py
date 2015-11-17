@@ -25,7 +25,11 @@ def _randND(*dims):
 
 def _sum_sq_err(input, target):
     residue = input - target
-    return 0.5 * np.dot(residue, residue)
+    ss_err = np.vdot(residue, residue) / 2
+    if math.isnan(ss_err):
+        return 1e4
+    else:
+        return ss_err
 
 class Net:
     """defines a neural network object"""
@@ -37,11 +41,11 @@ class Net:
             self (obj) -- the object being instatiated itself, implicitly called
                             WIP           
         """
-        self.input_len = input_len
-        self.layer0_len = layer0_len
-        self.layer1_len = layer1_len
-        self.layer2_len = layer2_len
-        self.output_len = output_len
+        self.input_len = int(input_len)
+        self.layer0_len = int(layer0_len)
+        self.layer1_len = int(layer1_len)
+        self.layer2_len = int(layer2_len)
+        self.output_len = int(output_len)
 
         self.input = np.ones(input_len + 1)
         self.output = np.zeros(output_len)
@@ -60,6 +64,8 @@ class Net:
         self.weight3 = np.random.random_sample((layer2_len + 1, output_len))
         
         self.CGD = CGD
+        if self.CGD:
+            print "fug"
         self.__zero()
 
     def feedforward(self, input): # ok
@@ -73,19 +79,21 @@ class Net:
         for j in range(self.layer0_len):
             self.activation0[j] = np.vdot(self.weight0[:,j], self.input)
         self.hmap0 = np.tanh(self.activation0)
+        # print self.hmap0
         
         for k in range(self.layer1_len):
             self.activation1[k] = np.vdot(self.weight1[:,k], self.hmap0)
         self.hmap1 = np.tanh(self.activation1)
+        # print self.hmap1
         
         for l in range(self.layer2_len):
             self.activation2[l] = np.vdot(self.weight2[:,l], self.hmap1)
-        self.hmap2 - np.tanh(self.activation2)
-
+        self.hmap2 = np.tanh(self.activation2)
+        # print self.hmap2
+        
         for m in range(self.output_len):
             self.output[m] = np.vdot(self.weight3[:,m], self.hmap2)
-
-        return self.output
+        # print self.output
 
     def __backprop(self, target): # ok
         l_product = np.zeros(self.layer2_len)
@@ -96,38 +104,45 @@ class Net:
         for m in range(self.output_len):
             for l in range(self.layer2_len + 1):
                 self.g_weight3[l,m] =  self.delta3[m] * self.hmap2[l]
+        # print self.g_weight3
+
         for l in range(self.layer2_len):
-            l_product[l] = self.delta2[l] * _dtanh(self.activation2[l])
             for m in range(self.output_len):
                 self.delta2[l] += self.delta3[m] * self.weight3[l,m]
+            l_product[l] = self.delta2[l] * _dtanh(self.activation2[l])
             for k in range(self.layer1_len + 1):
                 self.g_weight2[k,l] =  l_product[l] * self.hmap1[k]
+        # print self.g_weight2
+
         for k in range(self.layer1_len):
-            k_product[k] = self.delta1[k] * _dtanh(self.activation1[k])
             for l in range(self.layer2_len):
                 self.delta1[k] += l_product[l] * self.weight2[k,l]
-            for j in range(self.layer1_len + 1):
+            k_product[k] = self.delta1[k] * _dtanh(self.activation1[k])
+            for j in range(self.layer0_len + 1):
                 self.g_weight1[j,k] = k_product[k] * self.hmap0[j]
+        # print self.g_weight1
+
         for j in range(self.layer0_len):
-            j_product[j] = self.delta0[j] * _dtanh(self.activation0[j])
             for k in range(self.layer1_len):
                 self.delta0[j] += k_product[k] * self.weight1[j,k]
+            j_product[j] = self.delta0[j] * _dtanh(self.activation0[j])
             for i in range(self.input_len + 1):
-                self.g_weight0[i,j] = j_product[j] * self.input[i])
+                self.g_weight0[i,j] = j_product[j] * self.input[i]
+        # print self.g_weight0
 
     def __r_pass(self):
-        for j in range(self.layer0_len):
+        for j in range(self.layer0_len + 1):
             for i in range(self.input_len + 1):
                 self.r_activation0[j] += self.g_weight0[i,j] * self.input[i]
-            self.r_hmap0[j] = _dtanh(self.activation0[j]) * self.r_activation[j]
+            self.r_hmap0[j] = _dtanh(self.activation0[j]) * self.r_activation0[j]
 
-        for k in range(self.layer1_len):
+        for k in range(self.layer1_len + 1):
             for j in range(self.layer0_len + 1):
                 self.r_activation1[k] += self.weight1[j,k] * self.r_hmap0[j]
                 self.r_activation1[k] += self.g_weight1[j,k] * self.hmap0[j]
             self.r_hmap1[k] = _dtanh(self.activation1[k]) * self.r_activation1[k]
 
-        for l in range(self.layer2_len):
+        for l in range(self.layer2_len + 1):
             for k in range(self.layer1_len + 1):
                 self.r_activation2[l] += self.weight2[k,l] * self.r_hmap1[k]
                 self.r_activation2[l] += self.g_weight2[k,l] * self.hmap1[k]
@@ -165,7 +180,7 @@ class Net:
                 self.r_delta0[j] += tail_product * self.g_weight1[j,k] 
 
         for m in range(self.output_len):
-            for l in range(self.layer2_len + 1):
+            for l in range(self.layer2_len):
                 self.r_weight3[l,m] = self.r_delta3[m] * self.hmap2[l]
                 self.r_weight3[l,m] += self.delta3[m] * self.r_hmap2[l]
 
@@ -173,40 +188,42 @@ class Net:
             lead_product = self.r_delta2[l] * _dtanh(self.activation2[l])
             lead_product += self.delta2[l] * _ddtanh(self.activation2[l]) * self.r_activation2[l]
             tail_product = self.delta2[l] * _dtanh(self.activation2[l])
-            for k in range(self.layer1_len + 1):
+            for k in range(self.layer1_len):
                 self.r_weight2[k,l] = lead_product * self.hmap2[k]
                 self.r_weight2[k,l] += tail_product * self.r_hmap2[k]
 
         for k in range(self.layer1_len):
             lead_product = self.r_delta1[k] * _dtanh(self.activation1[k])
             lead_prodcut += self.delta1[k] * _ddtanh(self.activation1[k]) * self.r_activation1[k]
-            tail_porduct = self.delta1[k] * _dtanh*self.activation1[k])
-            for j in range(self.layer0_len + 1):
+            tail_porduct = self.delta1[k] * _dtanh(self.activation1[k])
+            for j in range(self.layer0_len):
                 self.r_weight1[j,k] = lead_product * self.hmap1[j]
                 self.r_weight1[j,k] += tail_product * self.r_hmap1[j]
 
         for j in range(self.layer0_len):
             lead_product = self.r_delta0[j] * _dtanh(self.activation0[j])
-            lead_product += self.delta0[j] * _ddtanh(self.activation0[j]_ * self.r_activation0[j]
+            lead_product += self.delta0[j] * _ddtanh(self.activation0[j]) * self.r_activation0[j]
             for i in range(self.input_len):
                 self.r_weight0[i,j] = lead_product * self.input[i]
 
-    def __weight_GD(step_size):
+    def __weight_GD(self,step_size):
+        # print self.weight0
+        # input("Enter...")
+        # print self.g_weight0
+        # input("Enter...")
+        self.weight0 -= step_size * self.g_weight0
+        # print self.weight0
+        # input("Enter...")
+
+        self.weight1 -= step_size * self.g_weight1
+
+        self.weight2 -= step_size * self.g_weight2
+
+        self.weight3 -= step_size * self.g_weight3
+
+    def __weight_CGD(self):
         direction0 = -self.g_weight0
-        self.weight0 += step_size * direction0
-
-        direction1 = -self.g_weight1
-        self.weight1 += step_size * direction1
-
-        direction2 = -self.g_weight2
-        self.weight2 += step_size * direction2
-
-        direction3 = -self.g_weight3
-        self.weight3 += step_size * direction3
-
-    def __weight_CGD():
-        direction0 = -self.g_weight0
-        denom0 = self.r_weight0 % direction0
+        denom0 = np.Matrix(self.r_weight0).T * direction0
         numer0 = direction0 % self.g_weight0
         numer0 += self.r_weight0 % -self.weight0
         step0 = numer0 / denom0
@@ -252,20 +269,20 @@ class Net:
 
     def err(self, input, target):
         self.feedforward(input)
-        return _sum_sq_err(result, target)
+        return _sum_sq_err(self.output, target)
 
-    def train_once(self, input, target, verbose=False, *step_size):
+    def train_once(self, input, target, verbose=False, **kwarg):
         result = self.feedforward(input)
         self.__backprop(target)
         if self.CGD:
             self.__r_pass()
             self.__weight_CGD()
         else:
-            self.__weight_GD(step_size)
-        result = self.feedforward(input)
+            self.__weight_GD(kwarg['step_size'])
+        self.feedforward(input)
         self.__zero()
         if verbose:
-            print _sum_sq_err(self.output, target)
+            print "train err: %f" % _sum_sq_err(self.output, target)
 
     def __train_N_GD(self, input, target, N, step_size):
         self.__train_N(input, target, N, self.__weight_GD, step_size)
@@ -274,32 +291,33 @@ class Net:
         self.__train_N(input, target, N, self.__weight_CGD)
 
     def __zero(self):
-        self.delta0 = np.zeros(layer0_len)
-        self.delta1 = np.zeros(layer1_len)
-        self.delta2 = np.zeros(layer2_len)
-        self.delta3 = np.zeros(output_len)
+        self.delta0 = np.zeros(self.layer0_len)
+        self.delta1 = np.zeros(self.layer1_len)
+        self.delta2 = np.zeros(self.layer2_len)
+        self.delta3 = np.zeros(self.output_len)
 
-        self.g_weight0 = np.zeros((input_len + 1, layer0_len))
-        self.g_weight1 = np.zeros((layer0_len + 1, layer1_len))
-        self.g_weight2 = np.zeros((layer1_len + 1, layer2_len))
-        self.g_weight3 = np.zeros((layer2_len + 1, output_len))
+        self.g_weight0 = np.zeros((self.input_len + 1, self.layer0_len))
+        self.g_weight1 = np.zeros((self.layer0_len + 1, self.layer1_len))
+        self.g_weight2 = np.zeros((self.layer1_len + 1, self.layer2_len))
+        self.g_weight3 = np.zeros((self.layer2_len + 1, self.output_len))
+
         if self.CGD:
-            self.r_activation0 = np.zeros(layer0_len + 1)
-            self.r_activation1 = np.zeros(layer1_len + 1)
-            self.r_activation2 = np.zeros(layer2_len + 1)
+            self.r_activation0 = np.zeros(self.layer0_len + 1)
+            self.r_activation1 = np.zeros(self.layer1_len + 1)
+            self.r_activation2 = np.zeros(self.layer2_len + 1)
 
-            self.r_hmap0 = np.zeros(layer0_len)
-            self.r_hmap1 = np.zeros(layer1_len)
-            self.r_hmap2 = np.zeros(layer2_len)
+            self.r_hmap0 = np.zeros(self.layer0_len + 1)
+            self.r_hmap1 = np.zeros(self.layer1_len + 1)
+            self.r_hmap2 = np.zeros(self.layer2_len + 1)
 
-            self.r_output = np.zeros(output_len)
+            self.r_output = np.zeros(self.output_len)
 
-            self.r_delta0 = np.zeros(layer0_len)
-            self.r_delta1 = np.zeros(layer1_len)
-            self.r_delta2 = np.zeros(layer2_len)
-            self.r_delta3 = np.zeros(layer3_len)
+            self.r_delta0 = np.zeros(self.layer0_len)
+            self.r_delta1 = np.zeros(self.layer1_len)
+            self.r_delta2 = np.zeros(self.layer2_len)
+            self.r_delta3 = np.zeros(self.output_len)
 
-            self.r_weight0 = np.zeros((input_len + 1, layer0_len))
-            self.r_weight1 = np.zeros((layer0_len + 1, layer1_len))
-            self.r_weight2 = np.zeros((layer1_len + 1, layer2_len))
-            self.r_weight3 = np.zeros((layer2_len + 1, output_len))
+            self.r_weight0 = np.zeros((self.input_len + 1, self.layer0_len))
+            self.r_weight1 = np.zeros((self.layer0_len + 1, self.layer1_len))
+            self.r_weight2 = np.zeros((self.layer1_len + 1, self.layer2_len))
+            self.r_weight3 = np.zeros((self.layer2_len + 1, self.output_len))
