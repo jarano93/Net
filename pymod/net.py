@@ -243,15 +243,18 @@ class Net:
             result = self.feedforward(input)
             self.__zero()
             print "%iteration: %i\tSumSquareError: %f" % (i, _sum_sq_err(result, target))
-        return result
     
     def train_N(self, input, target, N):
         if self.CGD:
-            return self.__train_N_CGD(input, target, N)
+            self.__train_N_CGD(input, target, N)
         else:
-            return self.__train_N_GD(input, target, N)
+            self.__train_N_GD(input, target, N)
 
-    def train_once(self, input, target, *step_size):
+    def err(self, input, target):
+        self.feedforward(input)
+        return _sum_sq_err(result, target)
+
+    def train_once(self, input, target, verbose=False, *step_size):
         result = self.feedforward(input)
         self.__backprop(target)
         if self.CGD:
@@ -261,14 +264,14 @@ class Net:
             self.__weight_GD(step_size)
         result = self.feedforward(input)
         self.__zero()
-        return _sum_sq_err(result, target)
+        if verbose:
+            print _sum_sq_err(self.output, target)
 
     def __train_N_GD(self, input, target, N, step_size):
         self.__train_N(input, target, N, self.__weight_GD, step_size)
 
     def __train_N_CGD(self, input, target, N):
         self.__train_N(input, target, N, self.__weight_CGD)
-            for k in range(self.layer1_len):
 
     def __zero(self):
         self.delta0 = np.zeros(layer0_len)
