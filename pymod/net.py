@@ -46,18 +46,18 @@ class Net:
         self.input = np.ones(input_len + 1)
         self.output = np.zeros(output_len)
 
-        self.activation0 = np.ones(layer0_len + 1)
-        self.activation1 = np.ones(layer1_len + 1)
-        self.activation2 = np.ones(layer2_len + 1)
+        self.activation0 = np.zeros(layer0_len + 1)
+        self.activation1 = np.zeros(layer1_len + 1)
+        self.activation2 = np.zeros(layer2_len + 1)
 
         self.hmap0 = np.zeros(layer0_len + 1)
         self.hmap1 = np.zeros(layer1_len + 1)
         self.hmap2 = np.zeros(layer2_len + 1)
 
-        self.weight0 = np.ones((input_len + 1, layer0_len))
-        self.weight1 = np.ones((layer0_len + 1, layer1_len))
-        self.weight2 = np.ones((layer1_len + 1, layer2_len))
-        self.weight3 = np.ones((layer2_len + 1, output_len))
+        self.weight0 = np.random.random_sample((input_len + 1, layer0_len))
+        self.weight1 = np.random.random_sample((layer0_len + 1, layer1_len))
+        self.weight2 = np.random.random_sample((layer1_len + 1, layer2_len))
+        self.weight3 = np.random.random_sample((layer2_len + 1, output_len))
         
         self.CGD = CGD
         self.__zero()
