@@ -261,8 +261,7 @@ class Net:
             self.__weight_GD(step_size)
         result = self.feedforward(input)
         self.__zero()
-        print _sum_sq_err(result, target)
-        return result
+        return _sum_sq_err(result, target)
 
     def __train_N_GD(self, input, target, N, step_size):
         self.__train_N(input, target, N, self.__weight_GD, step_size)
