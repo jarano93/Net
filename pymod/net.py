@@ -235,14 +235,14 @@ class Net:
  
     def __train_N(self, input, target, N, opt_func, *func_args):
         result = self.feedforward(input)
-        for i in range(N - 1):
+        for i in range(1, N):
             self.__backprop(target)
             if self.CGD:
                 self.__r_pass()
             opt_func(*func_args)
             result = self.feedforward(input)
             self.__zero()
-            print _sum_sq_err(result, target)
+            print "%iteration: %i\tSumSquareError: %f" % (i, _sum_sq_err(result, target))
         return result
     
     def train_N(self, input, target, N):
@@ -250,6 +250,19 @@ class Net:
             return self.__train_N_CGD(input, target, N)
         else:
             return self.__train_N_GD(input, target, N)
+
+    def train_once(self, input, target, *step_size):
+        result = self.feedforward(input)
+        self.__backprop(target)
+        if self.CGD:
+            self.__r_pass()
+            self.__weight_CGD()
+        else:
+            self.__weight_GD(step_size)
+        result = self.feedforward(input)
+        self.__zero()
+        print _sum_sq_err(result, target)
+        return result
 
     def __train_N_GD(self, input, target, N, step_size):
         self.__train_N(input, target, N, self.__weight_GD, step_size)
