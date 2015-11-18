@@ -36,8 +36,8 @@ for rep in range(reps):
         raw_input("Enter...")
         if accuracy > 0.85 and train_err < 5e-4:
             break
-        for i in r.sample(train_elems, 1):
-            test_net.train_once(data[i,1:-1], data[i,0], True)
+        for i in r.sample(train_elems, 35):
+            test_net.train_once(data[i,1:-1], data[i,0], True, learn=0.1, forget=1e-3)
             # print "output: %s\ttarget: %s" % (str(test_net.feedforward(data[i,1:-1])[0]), str(data[i,0]))
 
     test_err = 0

@@ -34,7 +34,7 @@ def _sum_sq_err(input, target):
 class Net:
     """defines a neural network object"""
 
-    def __init__(self, input_len, output_len, layer0_len, layer1_len, layer2_len, CGD=True):
+    def __init__(self, input_len, output_len, layer0_len, layer1_len, layer2_len, SMD=True):
         """This instantiates a neural network
         
         Args:
@@ -68,10 +68,18 @@ class Net:
         self.weight2 = 2 * np.random.random_sample((layer1_len + 1, layer2_len)) - 1
         self.weight3 = 2 * np.random.random_sample((layer2_len + 1, output_len)) - 1
         
-        self.CGD = CGD
-        if self.CGD:
-            print "fug"
+        self.SMD = SMD
         self.__zero()
+        if SMD:
+            self.step0 = 2 * np.random.random_sample((input_len + 1, layer0_len)) - 1
+            self.step1 = 2 * np.random.random_sample((layer0_len + 1, layer1_len)) - 1
+            self.step2 = 2 * np.random.random_sample((layer1_len + 1, layer2_len)) - 1
+            self.step3 = 2 * np.random.random_sample((layer2_len + 1, output_len)) - 1
+
+            self.aux0 = 2 * np.random.random_sample((input_len + 1, layer0_len)) - 1
+            self.aux1 = 2 * np.random.random_sample((layer0_len + 1, layer1_len)) - 1
+            self.aux2 = 2 * np.random.random_sample((layer1_len + 1, layer2_len)) - 1
+            self.aux3 = 2 * np.random.random_sample((layer2_len + 1, output_len)) - 1
 
     def feedforward(self, input): # ok
         """runs the net with given input and saves hidden activations"""
@@ -225,40 +233,41 @@ class Net:
 
         self.weight3 -= step_size * self.g_weight3
 
-    def __newton(self):
-        step = self.r_weight0 * self.g_weight0
-        print step
-        print "\n"
-        print self.weight0
-        print "\n"
-        self.weight0 -= step
-        print self.weight0
+    def __weight_SMD(self, learn, forget): #Stochastic Meta Descent
+        for i in xrange(self.input_len + 1):
+            for j in xrange(self.layer0_len):
+                self.step0[i,j] *= max(0.5, 1 + learn * self.aux0[i,j] * self.g_weight0[i,j])
 
-        step = self.r_weight1 * self.g_weight1
-        print step
-        print "\n"
-        print self.weight1
-        print "\n"
-        self.weight1 -= step
-        print self.weight1
+        for j in xrange(self.layer0_len + 1):
+            for k in xrange(self.layer1_len):
+                self.step1[j,k] *= max(0.5, 1 + learn * self.aux1[j,k] * self.g_weight1[j,k])
 
-        step = self.r_weight2 * self.g_weight2
-        print step
-        print "\n"
-        print self.weight2
-        print "\n"
-        self.weight2 -= step
-        print self.weight2
+        for k in xrange(self.layer1_len + 1):
+            for l in xrange(self.layer2_len):
+                self.step2[k,l] *= max(0.5, 1 + learn * self.aux2[k,l] * self.g_weight2[l,l])
 
-        step = self.r_weight3 * self.g_weight3
-        print step
-        print "\n"
-        print self.weight3
-        print "\n"
-        self.weight3 -= step
-        print self.weight3
+        for l in xrange(self.layer2_len + 1):
+            for m in xrange(self.output_len):
+                self.step3[l,m] *= max(0.5, 1 + learn * self.aux2[l,m] * self.g_weight3[l,m])
 
-    def __weight_CGD(self): # probably doesn't work
+        self.weight0 += self.step0 * self.g_weight0
+        self.weight1 += self.step1 * self.g_weight1
+        self.weight2 += self.step2 * self.g_weight2
+        self.weight3 += self.step3 * self.g_weight3
+
+        inner = self.g_weight0 + forget * np.dot(self.aux0, np.dot(self.g_weight0.T, self.r_weight0))
+        self.aux0 = forget * self.aux0 + (self.step0 * inner)
+
+        inner = self.g_weight1 + forget * np.dot(self.aux1, np.dot(self.g_weight1.T, self.r_weight1))
+        self.aux1 = forget * self.aux1 + (self.step1 * inner)
+
+        inner = self.g_weight2 + forget * np.dot(self.aux2, np.dot(self.g_weight2.T, self.r_weight2))
+        self.aux2 = forget * self.aux2 + (self.step2 * inner)
+
+        inner = self.g_weight3 + forget * np.dot(self.aux3, np.dot(self.g_weight3.T, self.r_weight3))
+        self.aux3 = forget * self.aux3 + (self.step3 * inner)
+
+    def __weight_CGD(self): # this is broken as hell
         denominator = np.dot(self.r_weight0.T, self.g_weight0)
         numerator = -np.dot(self.g_weight0.T, self.g_weight0)
         numerator -= np.dot(self.r_weight0.T, self.weight0)
@@ -331,8 +340,8 @@ class Net:
             print "%iteration: %i\tSumSquareError: %f" % (i, _sum_sq_err(result, target))
     
     def train_N(self, input, target, N):
-        if self.CGD:
-            self.__train_N_CGD(input, target, N)
+        if self.SMD:
+            self.__train_N_SMD(input, target, N)
         else:
             self.__train_N_GD(input, target, N)
 
@@ -343,9 +352,9 @@ class Net:
     def train_once(self, input, target, verbose=False, **kwarg):
         result = self.feedforward(input)
         self.__backprop(target)
-        if self.CGD:
+        if self.SMD:
             self.__r_pass()
-            self.__newton()
+            self.__weight_SMD(kwarg['learn'], kwarg['forget'])
         else:
             self.__weight_GD(kwarg['step_size'])
         self.feedforward(input)
@@ -356,8 +365,8 @@ class Net:
     def __train_N_GD(self, input, target, N, step_size):
         self.__train_N(input, target, N, self.__weight_GD, step_size)
 
-    def __train_N_CGD(self, input, target, N):
-        self.__train_N(input, target, N, self.__weight_CGD)
+    def __train_N_SMD(self, input, target, N):
+        self.__train_N(input, target, N, self.__weight_SMD)
 
     def __zero(self):
         self.delta0 = np.zeros(self.layer0_len)
@@ -370,8 +379,7 @@ class Net:
         self.g_weight2 = np.zeros((self.layer1_len + 1, self.layer2_len))
         self.g_weight3 = np.zeros((self.layer2_len + 1, self.output_len))
 
-        if self.CGD:
-            print "rzeros"
+        if self.SMD:
             self.r_activation0 = np.zeros(self.layer0_len + 1)
             self.r_activation1 = np.zeros(self.layer1_len + 1)
             self.r_activation2 = np.zeros(self.layer2_len + 1)
@@ -387,7 +395,8 @@ class Net:
             self.r_delta2 = np.zeros(self.layer2_len)
             self.r_delta3 = np.zeros(self.output_len)
 
-            self.r_weight0 = np.zeros((self.input_len + 1, self.layer0_len))
+            # a misnomer honestly, are Hessian * g_weight
+            self.r_weight0 = np.zeros((self.input_len + 1, self.layer0_len)) 
             self.r_weight1 = np.zeros((self.layer0_len + 1, self.layer1_len))
             self.r_weight2 = np.zeros((self.layer1_len + 1, self.layer2_len))
             self.r_weight3 = np.zeros((self.layer2_len + 1, self.output_len))
