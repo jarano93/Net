@@ -13,8 +13,8 @@ class FastNet():
     def __init__(self, input_len, output_len, layer0_len, layer1_len):
         self.input_len = int(input_len)
         self.layer0_len = int(layer0_len)
-        self.layer1_len = int(foo)
-        self.output_len = int(foo)
+        self.layer1_len = int(layer1_len)
+        self.output_len = int(output_len)
 
         self.output = np.zeros(output_len)
 
@@ -29,62 +29,63 @@ class FastNet():
         self.judge = False
         self.err_num = 0
         self.jump = False
-        self.step_size = 1e-4
 
     def result(self):
         return self.output
 
-    def run(self, innput):
+    def run(self, input):
         local_input = np.array(input)
         if len(local_input) != self.input_len:
             raise ValueError("Input length does not match expected length")
 
         local_input = np.append(local_input, 1)
 
-        work_val1 = np.ones(self.layer0_len)
+        work_val1 = np.ones(self.layer0_len + 1)
         for j in xrange(self.layer0_len ):
             work_val1[j] = np.vdot(self.weight0[j,:], local_input)
         work_val1 = np.tanh(work_val1)
 
-        work_val2 = np.ones(self.layer1_len):
+        work_val2 = np.ones(self.layer1_len + 1)
         for k in xrange(self.layer1_len):
             work_val2[k] = np.vdot(self.weight1[k,:], work_val1)
         work_val2 = np.tanh(work_val2)
         self.activation = work_val1
 
-        for l in xrange(self.layer2_len):
+        for l in xrange(self.output_len):
             self.output[l] = np.vdot(self.weight2[l,:], work_val2)
         self.output = np.tanh(self.output)
 
         return self.output
 
     def get_grad(self, target):
-        if len(target) != self.output_len:
-            raise ValueError("Target length does not match expected length")
+        # if len(target) != self.output_len:
+            # raise ValueError("Target length does not match expected length")
         residue = self.output - target
-        gradient = np.zeros((output_len, layer1_len + 1))
+        gradient = np.zeros((self.output_len, self.layer1_len + 1))
         for l in xrange(self.output_len):
             for k in xrange(self.layer1_len + 1):
-                gradient[l,k] = residue[l] * self,activation[k]
+                gradient[l,k] = residue[l] * self.activation[k]
         return gradient
 
-    def err(self, input, target):
-        self.run(input)
+    def err(self, data, target):
+        self.run(data)
         return sum_sq_err(self.output, target)
 
     def cerr(self, target):
         return sum_sq_err(self.output, target)
 
-    def train(self, input, target, verbose, single=True):
-        self.run(input)
-        if single:
-            self.update_err(target)
-        self.update_weight2(target)
+    def train(self, data, target, step_size, verbose=False, single=True):
+        self.run(data)
+        # if single:
+            # self.update_err(target)
+        self.update_weight2(target, step_size)
+        if verbose:
+            print "%f" % self.err(data, target)
 
-    def train_N(self, input, target, N, verbose=False):
+    def train_N(self, data, target, step_size, N, verbose=False):
         for i in xrange(N):
-            self.update_err()
-            self.train(input, target, verbose, False)
+            # self.update_err(target)
+            self.train(data, target, step_size, verbose, False)
 
     def update_err(self, target):
         self.errs[self.err_num] = self.cerr(target)
@@ -94,15 +95,15 @@ class FastNet():
         if self.judge:
             self.jump_step()
 
-    def update_weight2(self, target):
-        if self.jump:
-            rand_grad = np.random.random_sample((output_len, layer1_len - 0.5))
-            self.weight2 -= self.step_size * rand_grad
-        else:
-            self.weight2 -= self.step_size * self.get_grad(target)
+    def update_weight2(self, target, step_size):
+        # if self.jump:
+            # rand_grad = np.random.random_sample((output_len, layer1_len - 0.5))
+            # self.weight2 -= self.step_size * rand_grad
+        # else:
+        self.weight2 -= step_size * self.get_grad(target)
 
     def jump_step(self):
-        threshold = 1e-2
+        threshold = 1e-5
         cyclic_thrshold = 1e1
 
         n = self.err_num
@@ -113,12 +114,15 @@ class FastNet():
         if abs(self.errs[n]) < threshold:
             jump = False
         else:
-            if prev_ratios() > 0:
+            if prev_ratios() > 10:
+                # print "jump"
                 jump = True
                 self.step_size *= 4/3
             elif prev_ratios() >= -1:
-                #increase step size
+                # increase step size
+                # print "grow"
                 self.step_size *= 3/2
             else:
-                #decrease step_size
+                # decrease step_size
+                # print "shrink"
                 self.step_size *= 2/3
