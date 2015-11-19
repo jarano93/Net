@@ -31,7 +31,7 @@ def _sum_sq_err(input, target):
     else:
         return ss_err
 
-class Net:
+class Net():
     """defines a neural network object"""
 
     def __init__(self, input_len, output_len, layer0_len, layer1_len, layer2_len, CGD=True):
