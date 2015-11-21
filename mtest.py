@@ -6,10 +6,10 @@ import pymod.meme as meme
 
 data = np.genfromtxt('raw CVR.csv', delimiter=',')
 
-train_size = 80
-test_size = 355
+train_size = 35
+test_size = 400
 
-trust = 6e-1
+trust = 9e-2
 
 sets = 100
 
@@ -21,7 +21,7 @@ accuracies = []
 times = []
 
 for s in xrange(sets):
-        test_net = MemeFFNN(len(data[0,train_slice]), 1, 5, 7)
+        test_net = MemeFFNN(len(data[0,train_slice]), 1, 12, 7)
         total_elems = range(len(data))
         train_elems = r.sample(total_elems, train_size)
         train_set = np.array([data[train_elems[0],train_slice]])
@@ -33,7 +33,7 @@ for s in xrange(sets):
 
         print "initial set mean sq err: %f" % (test_net.set_meansq(train_set, target_set))
         start = time.time()
-        test_net.train_set_TOL(train_set, target_set, trust, 0.8, True)
+        test_net.train_set_TOL(train_set, target_set, trust, True)
         train_time = time.time() - start
         times.append(train_time)
         
@@ -57,7 +57,9 @@ for s in xrange(sets):
 print "\n****OVERAL PERFORMANCE***"
 print "AVERAGE TRAIN TIME: %f" % (sum(times) / len(times))
 print "AVERAGE MEAN SQ ERR: %f" % (sum(performance) / len(performance))
-print "AVERAGE ACCURACY: %f%%" %(sum(accuracies) / len(accuracies))
+print "AVERAGE ACCURACY: %f%%" % (sum(accuracies) / len(accuracies))
+print "MIN ACCURACY: %f%%" % (min(accuracies) * 100)
+print "MAX ACCURACY: %f%%" % (max(accuracies) * 100)
 print "STD TIMES: %f" % (np.std(times))
 print "STD MEAN SQ ERR: %f" % (np.std(performance))
 print "STD ACCURACY: %f%%" % (np.std(accuracies))

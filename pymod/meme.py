@@ -19,10 +19,28 @@ def dtanh(x):
     return 1 - pow(np.tanh(x), 2)
 
 def sig(x):
-    try:
-        return np.ones(len(x)) / (1 + np.exp(x))
-    except:
-        return 1 / (1 + np.exp(x))
+    if type(x) == float or type(x) == int:
+        if x > 2e2:
+            return 1
+        elif x < -2e2:
+            return 0
+        else:
+            return 1 / (1 + math.exp(-x))
+    else:
+        n = len(x)
+        try:
+            return np.ones(len(x)) / (1 + np.exp(-x))
+        except FloatingPointError:
+            result = np.zeros(len(x))
+            for i in xrange(n):
+                val = x[i]
+                if val > 4e2:
+                    result[i] = n
+                elif val < -4e2:
+                    result[i] = 0
+                else:
+                    result[i] = n / (1 + math.exp(-val))
+            return result
     
 def dsig(x):
     return sig(x) * (1 - sig(x))
@@ -38,6 +56,7 @@ def mean_sq_err(a, b):
     residue = a - b
     return np.vdot(residue, residue) / n
 
+# consider swapping out tanh & dtanh for sig & dsig
 class MemeFFNN():
     """ defines a 2 layer that uses MEMES of itself to optimize itself """
     #  We Metal Gear Solid Now
@@ -76,11 +95,11 @@ class MemeFFNN():
         self.indata = np.append(indata, 1)
         for j in range(self.layer0_len):
             self.activation0[j] = np.vdot(self.weight0[:,j], self.indata)
-        self.hmap0 = np.tanh(self.activation0)
+        self.hmap0 = sig(self.activation0)
         
         for k in range(self.layer1_len):
             self.activation1[k] = np.vdot(self.weight1[:,k], self.hmap0)
-        self.hmap1 = np.tanh(self.activation1)
+        self.hmap1 = sig(self.activation1)
         
         for l in range(self.output_len):
             self.output[l] = np.vdot(self.weight2[:,l], self.hmap1)
@@ -98,12 +117,12 @@ class MemeFFNN():
         activation1 = np.ones(self.layer0_len + 1)
         for j in range(self.layer0_len):
             activation1[j] = np.vdot(self.weight0[:,j], local_data)
-        activation1 = np.tanh(activation1)
+        activation1 = sig(activation1)
         
         activation2 = np.ones(self.layer1_len + 1)
         for k in range(self.layer1_len):
             activation2[k] = np.vdot(self.weight1[:,k], activation1)
-        activation2 = np.tanh(activation2)
+        activation2 = sig(activation2)
         
         activation1 = np.ones(self.output_len)
         for l in range(self.output_len):
@@ -128,7 +147,7 @@ class MemeFFNN():
         delta2 = np.zeros(self.output_len)
         for l in xrange(self.output_len):
             # try:
-            delta2[l] = 2 * abs(self.output[l] - target_array[l]) / n
+            delta2[l] = 2 * (self.output[l] - target_array[l]) / n
             # except:
                 # print delta2[l]
                 # print self.output[l]
@@ -202,6 +221,7 @@ class MemeFFNN():
         return mean_sq_err(self.output, target)
 
     # only use this if a single observation is representative of the entire dataset
+    # so never use it
     def train(self, indata, target, trust, verbose=False):
         # The time has come to an end
         start_w0, start_w1, start_w2 = self.get_weights()
@@ -250,7 +270,7 @@ class MemeFFNN():
         if verbose:
             print "update mean square error: %f" % (min_err)
 
-    def train_set(self, trainset, targetset, trust, verbose=False, rands=20):
+    def train_set(self, trainset, targetset, trust, verbose=False, rands=500):
         # now with more copypasting
         start_w0, start_w1, start_w2 = self.get_weights()
         best_w0 , best_w1 , best_w2 = self.get_weights()
@@ -283,24 +303,26 @@ class MemeFFNN():
                                 min_err = local_err
                                 best_w0, best_w1, best_w2 = self.get_weights()
                             self.set_weights(start_w0, start_w1, start_w2)
-
-        steps = steps / 10
+        # print 'rands'
+        rsteps = np.linspace(1, -2, 4)
+        rsteps = np.power(10, rsteps)
         for i in xrange(rands):
             cand0, cand1, cand2 = self.rand_candidates()
-            for s0 in steps:
-                for s1 in steps:
-                    for s2 in steps:
-                            self.update_weights(s0, cand0, s1, cand1, s2, cand2)
-                            local_err = self.set_meansq(trainset, targetset)
-                            if local_err < trust:
-                                min_err = local_err
-                                if verbose:
-                                    print "set mean square error: %f" % (min_err)
-                                return
-                            if local_err < min_err:
-                                min_err = local_err
-                                best_w0, best_w1, best_w2 = self.get_weights()
-                            self.set_weights(start_w0, start_w1, start_w2)
+            for s0 in rsteps:
+                for s1 in rsteps:
+                    for s2 in rsteps:
+                        self.update_weights(s0, cand0*best_w0, s1, cand1*best_w1, s2, cand2*best_w2)
+                        local_err = self.set_meansq(trainset, targetset)
+                        if local_err < trust:
+                            min_err = local_err
+                            if verbose:
+                                print "set mean square error: %f" % (min_err)
+                            return
+                        if local_err < min_err:
+                            # print 'r'
+                            min_err = local_err
+                            best_w0, best_w1, best_w2 = self.get_weights()
+                        self.set_weights(start_w0, start_w1, start_w2)
         self.set_weights(best_w0, best_w1, best_w2)
         if verbose:
             print "set mean square error: %f" % (min_err)
