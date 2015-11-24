@@ -3,15 +3,6 @@
 import numpy as np
 import math
 
-def eye(x):
-    return x
-
-def deye(x):
-    try:
-        return np.ones(len(x))
-    except:
-        return 1
-
 def tanh(x):
     return np.tanh(x)
 
@@ -19,7 +10,7 @@ def dtanh(x):
     return 1 - pow(np.tanh(x), 2)
 
 def sig(x):
-    if type(x) == float or type(x) == int:
+    if type(x) == float or type(x) == int or type(x) == np.float64:
         if x > 2e2:
             return 1
         elif x < -2e2:
@@ -58,7 +49,7 @@ def mean_sq_err(a, b):
 
 # consider swapping out tanh & dtanh for sig & dsig
 class MemeFFNN():
-    """ defines a 2 layer that uses MEMES of itself to optimize itself """
+    """ defines a 2 layer that uses MEMES to optimize itself """
     #  We Metal Gear Solid Now
 
     def __init__(self, indata_len, output_len, layer0_len, layer1_len):
@@ -131,6 +122,7 @@ class MemeFFNN():
  
     # Snake! Answer me!
     def backprop(self, target):
+        # I sure do like underflow errors (^:
         np.seterr(all='raise')
 
         grad0 = np.zeros(self.shape_w0)
@@ -146,43 +138,46 @@ class MemeFFNN():
         # delta2 = 2 * np.absolute(self.output - np.array(target))  / self.output_len
         delta2 = np.zeros(self.output_len)
         for l in xrange(self.output_len):
-            # try:
             delta2[l] = 2 * (self.output[l] - target_array[l]) / n
-            # except:
-                # print delta2[l]
-                # print self.output[l]
-                # print target_array[l]
-                # print n
-                # raw_input('hold')
-            if delta2[l] < 1e-7:
+            if abs(delta2[l]) < 1e-8:
                 delta2[l] = 0
             for k in xrange(self.layer1_len + 1):
-                grad2[k,l] = delta2[l] * self.hmap1[k]
-                if grad2[k,l] < 1e-8:
+                if abs(self.hmap1[k]) < 1e-8:
+                    grad2[k,l] = 0
+                else:
+                    grad2[k,l] = delta2[l] * self.hmap1[k]
+                if abs(grad2[k,l]) < 1e-8:
                     grad2[k,l] = 0
 
         delta1 = np.zeros(self.layer1_len)
         for k in xrange(self.layer1_len):
             for  l in xrange(self.output_len):
                 delta1[k] += delta2[l] * self.hmap1[k]
-            if delta1[k] < 1e-7:
+            if abs(delta1[k]) < 1e-8:
                 delta1[k] = 0
-            k_product[k] = delta1[l] * dtanh(self.activation1[k])
+            k_product[k] = delta1[l] * dsig(self.activation1[k])
+            if abs(k_product[k]) < 1e-6:
+                k_product[k] = 0
             for j in xrange(self.layer0_len + 1):
-                grad1[j,k] = k_product[k] * self.hmap0[j]
-                if grad1[j,k] < 1e-7:
+                if abs(self.hmap0[j]) < 1e-8:
+                    grad1[j,k] = 0
+                else:
+                    grad1[j,k] = k_product[k] * self.hmap0[j]
+                if abs(grad1[j,k]) < 1e-6:
                     grad1[j,k] = 0
 
         delta0 = np.zeros(self.layer0_len)
         for j in range(self.layer0_len):
             for k in range(self.layer1_len):
                 delta0[j] += k_product[k] * self.weight1[j,k]
-            if delta0[j] < 1e-7:
+            if abs(delta0[j]) < 1e-8:
                 delta0[j] = 0
-            j_product[j] = delta0[j] * dtanh(self.activation0[j])
+            j_product[j] = delta0[j] * dsig(self.activation0[j])
+            if abs(j_product[j]) < 1e-8:
+                j_product[j] = 0
             for i in range(self.indata_len + 1):
                 grad0[i,j] = j_product[j] * self.indata[i]
-                if grad0[i,j] < 1e-7:
+                if abs(grad0[i,j]) < 1e-8:
                     grad0[i,j] = 0
 
         del delta0, delta1, delta2, k_product, j_product, target_array
@@ -306,12 +301,18 @@ class MemeFFNN():
         # print 'rands'
         rsteps = np.linspace(1, -2, 4)
         rsteps = np.power(10, rsteps)
+        methods = range(2)
+        div = 100
         for i in xrange(rands):
             cand0, cand1, cand2 = self.rand_candidates()
             for s0 in rsteps:
                 for s1 in rsteps:
                     for s2 in rsteps:
-                        self.update_weights(s0, cand0*best_w0, s1, cand1*best_w1, s2, cand2*best_w2)
+                        for m in methods:
+                            if (m + 1) % 2 == 0:
+                                self.update_weights(s0, cand0*best_w0, s1, cand1*best_w1, s2, cand2*best_w2)
+                            else:
+                                self.update_weights(s0/div, cand0+best_w0, s1/div, cand1+best_w1, s2/div, cand2+best_w2)
                         local_err = self.set_meansq(trainset, targetset)
                         if local_err < trust:
                             min_err = local_err

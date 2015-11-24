@@ -2,6 +2,19 @@
 
 import numpy as np
 
+def pca(data, num):
+    # at the moment can only handle a data matrix of N observations each with D length
+    # so data must be 2D
+    # assumed the observations are store along the 0th axis of data
+    zero_mean = data - np.mean(data, axis=0)
+    U, S = np.linalg.svd(zero_mean)[0:2]
+    S_diag = np.zeros((data.shape[0], num))
+    for i in xrange(num):
+        S_diag[i,i] = S[i]
+    return np.dot(U, S_diag)
+
+# idk how practical MiniBatch and WideBatch are in retrospect, but at the time
+# I wrote them they seemed very good
 class MiniBatch():
     """
         given data where dim(data) >= 2 delivers batches piecewise
