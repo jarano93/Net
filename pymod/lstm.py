@@ -46,8 +46,8 @@ def softmax(x): # x assumed to be a 1d vector
     denom = np.sum(np_exp)
     return x_exp / denom
 
-# an deep RNN inspired by Alex Graves' own work with RNNs of LSTMs
-class DeepLSTM:
+# an LSTM inspired by Alex Graves' own work with RNNs of LSTMs
+class LSTM:
 
     def __init__(self, data_len):
         self.data_len = int(data_len)
@@ -56,244 +56,277 @@ class DeepLSTM:
 
         self.output = rand_ND(data_len) # stores the most recent 
 
+        self.master_step = 1e-2
+
         # Why aren't I defining an LSTM object?  I think bptt might be wonky between objects
         # gonna hardcode first
 
-        ###############
-        #    LSTM0    #
-        ###############
+        ##############
+        #    LSTM    #
+        ##############
 
         # fed in the input data--a single observation in a sequence
         # its output gets fed into LSTM1
 
-        # defines the input gate, and the biases and weights used to calculate it for lstm0
-        self.gate_i0 = rand_ND(data_len)
-        self.w_d_i0 = rand_ND(data_len)
-        self.w_h_i0 = rand_ND(data_len)
-        self.w_c_i0 = rand_ND(data_len)
-        self.b_i0 = rand_ND(data_len)
-
-        # and their gradients
-        self.gw_d_i0 = np.zeros(data_len)
-        self.gw_h_i0 = np.zeros(data_len)
-        self.gw_c_i0 = np.zeros(data_len)
-        self.gb_i0 = np.zeros(data_len)
+        # defines the input gate, the argument of its activation function, and the biases and weights used to calculate it
+        self.gate_i = np.zeros(data_len)
+        self.act_i = np.zeros(data_len)
+        self.w_x_i = rand_ND(data_len)
+        self.w_h_i = rand_ND(data_len)
+        self.w_c_i = rand_ND(data_len)
+        self.b_i = rand_ND(data_len)
 
         # and the sum of the elem-wise squares of all past gradients for adagrad
-        self.hw_d_i0 = np.zeros(data_len)
-        self.hw_h_i0 = np.zeros(data_len)
-        self.hw_c_i0 = np.zeros(data_len)
-        self.hb_i0 = np.zeros(data_len)
+        self.hw_x_i = np.zeros(data_len)
+        self.hw_h_i = np.zeros(data_len)
+        self.hw_c_i = np.zeros(data_len)
+        self.hb_i = np.zeros(data_len)
 
-        # defines the forget gate, and the biases and weights used to calculate it for lstm0
-        self.gate_f0 = rand_ND(data_len)
-        self.w_d_f0 = rand_ND(data_len)
-        self.w_h_f0 = rand_ND(data_len)
-        self.w_c_f0 = rand_ND(data_len)
-        self.b_f0 = rand_ND(data_len)
-
-        # and their gradients
-        self.gw_d_f0 = np.zeros(data_len)
-        self.gw_h_f0 = np.zeros(data_len)
-        self.gw_c_f0 = np.zeros(data_len)
-        self.gb_f0 = np.zeros(data_len)
+        # defines the forget gate, the argument of its activation function, and the biases and weights used to calculate it
+        self.gate_f = np.zeros(data_len)
+        self.act_f = np.zeros(data_len)
+        self.w_x_f = rand_ND(data_len)
+        self.w_h_f = rand_ND(data_len)
+        self.w_c_f = rand_ND(data_len)
+        self.b_f = rand_ND(data_len)
 
         # and the sum of the elem-wise squares of all past gradients for adagrad
-        self.hw_d_f0 = np.zeros(data_len)
-        self.hw_h_f0 = np.zeros(data_len)
-        self.hw_c_f0 = np.zeros(data_len)
-        self.hb_f0 = np.zeros(data_len)
+        self.hw_x_f = np.zeros(data_len)
+        self.hw_h_f = np.zeros(data_len)
+        self.hw_c_f = np.zeros(data_len)
+        self.hb_f = np.zeros(data_len)
 
-        # defines the cell state, and the biases and weights used to calculate it for lstm0
-        self.cell0 = rand_ND(data_len)
-        self.w_d_c0 = rand_ND(data_len)
-        self.w_h_c0 = rand_ND(data_len)
-        self.b_c0 = rand_ND(data_len)
+        # defines the cell state, the argument of its activation function, and the biases and weights used to calculate it
+        self.cell = np.zeros(data_len)
+        self.act_c = np.zeros(data_len)
+        self.w_x_c = rand_ND(data_len)
+        self.w_h_c = rand_ND(data_len)
 
-        # and their gradients 
-        self.gw_d_c0 = np.zeros(data_len)
-        self.gw_h_c0 = np.zeros(data_len)
-        self.gb_c0 = np.zeros(data_len)
+        # defines the former cell state
+        self.cell_past = np.zeros(data_len)
 
         # and the sum of the elem-wise squares of all past gradients for adagrad
-        self.hw_d_c0 = np.zeros(data_len)
-        self.hw_h_c0 = np.zeros(data_len)
-        self.hb_c0 = np.zeros(data_len)
+        self.hw_x_c = np.zeros(data_len)
+        self.hw_h_c = np.zeros(data_len)
 
-        # defines the output gate, and the biases and weights used to calculate it for lstm0
-        self.gate_o0 = rand_ND(data_len)
-        self.w_d_o0 = rand_ND(data_len)
-        self.w_h_o0 = rand_ND(data_len)
-        self.w_c_o0 = rand_ND(data_len)
-        self.b_o0 = rand_ND(data_len)
-
-        # and their gradients
-        self.gw_d_o0 = np.zeros(data_len)
-        self.gw_h_o0 = np.zeros(data_len)
-        self.gw_c_o0 = np.zeros(data_len)
-        self.gb_o0 = np.zeros(data_len)
+        # defines the output gate, the argument of its activation function, and the biases and weights used to calculate it
+        self.gate_o = np.zeros(data_len)
+        self.act_o = np.zeros(data_len)
+        self.w_x_o = rand_ND(data_len)
+        self.w_h_o = rand_ND(data_len)
+        self.w_c_o = rand_ND(data_len)
+        self.b_o = rand_ND(data_len)
 
         # and the sum of the elem-wise squares of all past gradients for adagrad
-        self.hw_d_o0 = np.zeros(data_len)
-        self.hw_h_o0 = np.zeros(data_len)
-        self.hw_c_o0 = np.zeros(data_len)
-        self.hb_o0 = np.zeros(data_len)
+        self.hw_x_o = np.zeros(data_len)
+        self.hw_h_o = np.zeros(data_len)
+        self.hw_c_o = np.zeros(data_len)
+        self.hb_o = np.zeros(data_len)
 
-        # the hidden output of lstm0
-        self.hidden0 = rand_ND(data_len)
+        # the hidden output of the lstm, and the previous hidden output
+        self.hidden_old = np.zeros(data_len)
+        self.hidden = np.zeros(data_len)
+        self.output = np.zeros(data_len)
 
-        ##############
-        #   LSTM1    #
-        ##############
-
-        # fed in output from LSTM0
-        # output gets softmaxed
-        # then finds max val in softmaxed output
-        # then gets returned as the one-hot of the argmax of the softmax
-        # keep the og output though for adagrad
-
-        # defines the input gate, and the biases and weights used to calculate it for lstm1
-        self.gate_i1 = rand_ND(data_len)
-        self.w_d_i1 = rand_ND(data_len)
-        self.w_h_i1 = rand_ND(data_len)
-        self.w_c_i1 = rand_ND(data_len)
-        self.b_i1 = rand_ND(data_len)
-
-        # and their gradients
-        self.gw_d_i1 = np.zeros(data_len)
-        self.gw_h_i1 = np.zeros(data_len)
-        self.gw_c_i1 = np.zeros(data_len)
-        self.gb_i1 = np.zeros(data_len)
-
-        # and the sum of the elem-wise squares of all past gradients for adagrad
-        # h is for history!
-        self.hw_d_i1 = np.zeros(data_len)
-        self.hw_h_i1 = np.zeros(data_len)
-        self.hw_c_i1 = np.zeros(data_len)
-        self.hb_i1 = np.zeros(data_len)
-
-        # defines the forget gate, and the biases and weights used to calculate it for lstm1
-        self.gate_f1 = rand_ND(data_len)
-        self.w_d_f1 = rand_ND(data_len)
-        self.w_h_f1 = rand_ND(data_len)
-        self.w_c_f1 = rand_ND(data_len)
-        self.b_f1 = rand_ND(data_len)
-
-        # and their gradients
-        self.gw_d_f1 = np.zeros(data_len)
-        self.gw_h_f1 = np.zeros(data_len)
-        self.gw_c_f1 = np.zeros(data_len)
-        self.gb_f1 = np.zeros(data_len)
-
-        # and the sum of the elem-wise squares of all past gradients for adagrad
-        self.hw_d_f1 = np.zeros(data_len)
-        self.hw_h_f1 = np.zeros(data_len)
-        self.hw_c_f1 = np.zeros(data_len)
-        self.hb_f1 = np.zeros(data_len)
-
-        # defines the cell state, and the biases and weights used to calculate it for lstm1
-        self.cell1 = rand_ND(data_len)
-        self.w_d_c1 = rand_ND(data_len)
-        self.w_h_c1 = rand_ND(data_len)
-        self.b_c1 = rand_ND(data_len)
-
-        # and their gradients 
-        self.gw_d_c1 = np.zeros(data_len)
-        self.gw_h_c1 = np.zeros(data_len)
-        self.gb_c1 = np.zeros(data_len)
-
-        # and the sum of the elem-wise squares of all past gradients for adagrad
-        self.hw_d_c1 = np.zeros(data_len)
-        self.hw_h_c1 = np.zeros(data_len)
-        self.hb_c1 = np.zeros(data_len)
-
-        # defines the output gate, and the biases and weights used to calculate it for lstm1
-        self.gate_o1 = rand_ND(data_len)
-        self.w_d_o1 = rand_ND(data_len)
-        self.w_h_o1 = rand_ND(data_len)
-        self.w_c_o1 = rand_ND(data_len)
-        self.b_o1 = rand_ND(data_len)
-
-        # and their gradients
-        self.gw_d_o1 = np.zeros(data_len)
-        self.gw_h_o1 = np.zeros(data_len)
-        self.gw_c_o1 = np.zeros(data_len)
-        self.gb_o1 = np.zeros(data_len)
-
-        # and the sum of the elem-wise squares of all past gradients for adagrad
-        self.hw_d_o1 = np.zeros(data_len)
-        self.hw_h_o1 = np.zeros(data_len)
-        self.hw_c_o1 = np.zeros(data_len)
-        self.hb_o1 = np.zeros(data_len)
-
-        # the hidden output of lstm1
-        self.hidden1 = rand_ND(data_len)
-
-        # stores the previous loss value, in order to calculate the NEXT loss value :(
-        self.loss = 0
-
-        #yeah, im defining an LSTM object if I ever improve this project once I'm done
+        # yeah, im defining a modular LSTM object if I ever improve this project once I'm done
+        # LSTM grids
+        # LSTM cubes
+        # LSTM hypercubes
 
     # feedforward data through the network
     def ff(self, data, verbose=True):
-        self.gate_i0 = sig(self.w_d_i0 * data + self.w_h_i0 * self.hidden0 + self.w_c_i0 * self.cell0 + self.b_i0)
-        self.gate_f0 = sig(self.w_d_f0 * data + self.w_h_f0 * self.hidden0 + self.w_c_f0 * self.cell0 + self.b_f0)
-        self.cell0 = self.gate_f0 * self.cell0 + self.gate_i0 * tanh(self.w_d_c0 * data0 + self.w_h_c0 * self.hidden0 + celf.b_c0)
-        self.gate_o0 = sig(self.w_d_o0 * data + self.w_h_o0 * self.hidden0 + self.w_c_o0 * self.cell0 + self.b_o0)
-        self.hidden0 = self.gate_o0 * tanh(self.cell0)
+        if len(data) != self.data_len:
+            raise ValueError("Unexpected data length during feedforward")
+        self.hidden_old = self.hidden
+        self.cell_old = self.cell
 
-        self.gate_i1 = sig(self.w_d_i1 * data + self.w_h_i1 * self.hidden1 + self.w_c_i1 * self.cell1 + self.b_i1)
-        self.gate_f1 = sig(self.w_d_f1 * data + self.w_h_f1 * self.hidden1 + self.w_c_f1 * self.cell1 + self.b_f1)
-        self.cell1 = self.gate_f1 * self.cell1 + self.gate_i1 * tanh(self.w_d_c1 * data1 + self.w_h_c1 * self.hidden1 + celf.b_c1)
-        self.gate_o1 = sig(self.w_d_o1 * data + self.w_h_o1 * self.hidden1 + self.w_c_o1 * self.cell1 + self.b_o1)
-        self.hidden1 = self.gate_o1 * tanh(self.cell1)
-       
-        # at the moment just returns what it thinks is the most likely output
-        # I could probably fix this pretty easily
-        # I mean, I cache self.hidden1
-        # nbd atm tbh fam
-        self.output = oh.hot(np.argmax(softmax(self.hidden1)))
+        self.act_i = self.w_d_i * data + self.w_h_i * self.hidden + self.w_c_i * self.cell + self.b_i
+        self.gate_i = sig(self.act_i)
+
+        self.act_f = self.w_d_f * data + self.w_h_f * self.hidden + self.w_c_f * self.cell + self.b_f
+        self.gate_f = sig(self.act_f)
+
+        self.act_c = self.w_d_c * data + self.w_h_c * self.hidden + celf.b_c
+        self.cell = self.gate_f * self.cell + self.gate_i * tanh(self.act_c)
+
+        self.act_g = self.w_d_o * data + self.w_h_o * self.hidden + self.w_c_o * self.cell + self.b_o
+        self.gate_o = sig(self.act_g)
+
+        self.hidden = self.gate_o * tanh(self.cell)
+
+        self.output = softmax(self.hidden)
         if verbose:
             return self.output
 
-    def bptt(self, target):
-        return 'ayylmao'
+    def bptt(self, sequence):
+        if len(sequence[0]) != self.data_len:
+            raise ValueError("Unexpected data length during bptt")
+        seq_shape = sequence.shape
+        seq_len = seq_shape[0]
+
+        # the sequence to be fed into feedforward, starts out with all zeros
+        ff_seq = np.append((np.zeros(self.data_len),  sequence), axis=0)
+
+        # delta & gradients for the output gate
+        delta_o = np.zeros(self.data_len)
+        g_x_o = np.zeros(self.data_len)
+        g_h_o = np.zeros(self.data_len)
+        g_c_o = np.zeros(self.data_len)
+        g_o = np.zeros(self.data_len)
+
+        # delta & gradients for the cell state, and a fast link to the cell state
+        delta_c = np.zeros(self.data_len)
+        g_x_c = np.zeros(self.data_len)
+        g_h_c = np.zeros(self.data_len)
+        
+        link = np.zeros(self.data_len)
+
+        # delta & gradients for the forget gate
+        delta_f = np.zeros(self.data_len)
+        g_x_f = np.zeros(self.data_len)
+        g_h_f = np.zeros(self.data_len)
+        g_c_f = np.zeros(self.data_len)
+        g_f = np.zeros(self.data_len)
+
+
+        # delta & gradients for the input gate
+        delta_i = np.zeros(self.data_len)
+        g_x_i = np.zeros(self.data_len)
+        g_h_i = np.zeros(self.data_len)
+        g_c_i = np.zeros(self.data_len)
+        g_i = np.zeros(self.data_len)
+        
+        for t in xrange(self.seq_len):
+            ff_data = ff_seq[t,:]
+            target = sequence[t,:]
+
+            residue = self.ff(ff_data) - target
+
+            delta_o = residue * tanh(self.cell) * dsig(self.act_o)
+            g_x_o += delta_o * ff_data
+            g_h_o += delta_o * self.hidden_old
+            g_c_o += delta_o * self.cell
+            g_o += delta_o
+
+            link = residue * (tanh(self.cell) * dsig(self.act_o) * self.w_c_o + self.gate_o * dtanh(self.cell))
+
+            delta_c = link * self.gate_i * dtanh(self.act_c)
+            g_x_c += delta_c * ff_data
+            g_h_c += delta_c * self.hidden_old
+
+            delta_f = link * self.cell_old * dsig(self.act_c)
+            g_x_f += delta_f * ff_data
+            g_h_f += delta_f * self.hidden_old
+            g_c_f += delta_f * self.cell_old
+            g_f += delta_f
+
+            delta_i = link * tanh(self.act_c) * dsig(act_i)
+            g_x_i += delta_i * ff_data
+            g_h_i += delta_i * self.hidden_old
+            g_c_i += delta_i * self.cell_old
+            g_i += delta_i
+
+        return g_x_i, g_h_i, g_c_i, g_i, g_x_f, g_h_f, g_c_f, g_f, g_x_c, g_h_c, g_x_o, g_h_o, g_c_o, g_o
 
     def sample(self, sample_len):
         result = np.zeros((self.data_len, sample_len))
-        start = np.zeros(self.data_len)
-        for i in xrange(sample_len)
-            if i == 0:
-                result[i,:] = self.ff(start)
-            else:
-                result[i,:] = self.ff(result[i-1,:])
+        seed = np.zeros(self.data_len)
+        for i in xrange(sample_len):
+            result[i,:] = oh.hot(np.argmax(self.ff(seed)))
+            seed = result[i,:]
         return result
 
-    def loss(self, target, verbose=True):
+    def train(self, sequence, verbose=True):
+        self.bptt(sequence)
+        return self.seq_loss(sequence, verbose)
 
+    def train_N(self, sequence, N, verbose=True):
+        for n in xrange(N):
+            self.train(sequence, verbose)
+
+    def train_TOL(self, sequence, TOL, verbose=True):
+        while True:
+            loss = self.train(sequence, verbose)
+            if loss < TOL:
+                break
+
+    def seq_loss(self, sequence, verbose=True):
+        if len(sequence[0]) != self.data_len:
+            raise ValueError("Unexpected data length during bptt")
+        seq_shape = sequence.shape
+        ff_seq = np.append(np.zeros(data_len), sequence, axis=0)
+        loss = 0
+        for t in xrange(len(sequence[0])):
+            ff_data = ff_sequence[t,:]
+            actual = sequence[t,:]
+            key = int(np.argmax(actual))
+            output = self.ff(ff_data)
+            loss -= math.log(output[key])
         if verbose:
-            return self.loss
+            print "current sequence loss: %f" % (loss)
+        return loss
 
     def adagrad(self):
-        grad0, grad1, grad2 = self.bptt()
+        g_x_i, g_h_i, g_c_i, g_i, g_x_f, g_h_f, g_c_f, g_f, g_x_c, g_h_c, g_x_o, g_h_o, g_c_o, g_o = self.bptt()
 
-        ones0 = np.ones(self.weight0.shape)
-        ones1 = np.ones(self.weight1.shape)
-        ones2 = np.ones(self.weight2.shape)
+        ones = np.ones(self.data_len)
 
         step_tol = 1e-6
 
-        step0 = self.step / np.sqrt((step_tol * ones0) + self.history0)
-        step1 = self.step / np.sqrt((step_tol * ones1) + self.history1)
-        step2 = self.step / np.sqrt((step_tol * ones2) + self.history2)
+        #calculate all the step sizes
+        s_x_i = self.master_step / np.sqrt((step_tol * ones) + self.hw_x_i)
+        s_h_i = self.master_step / np.sqrt((step_tol * ones) + self.hw_h_i)
+        s_c_i = self.master_step / np.sqrt((step_tol * ones) + self.hw_c_i)
+        s_i = self.master_step / np.sqrt((step_tol * ones) + self.hb_i)
 
-        self.history0 += np.sq(grad0)
-        self.history1 += np.sq(grad1)
-        self.history2 += np.sq(grad2)
+        s_x_f = self.master_step / np.sqrt((step_tol * ones) + self.hw_x_f)
+        s_h_f = self.master_step / np.sqrt((step_tol * ones) + self.hw_h_f)
+        s_c_f = self.master_step / np.sqrt((step_tol * ones) + self.hw_c_f)
+        s_f = self.master_step / np.sqrt((step_tol * ones) + self.hb_f)
 
-        return step0*grad0, step1*grad1, step2*grad2
+        s_x_c = self.master_step / np.sqrt((step_tol * ones) + self.hw_x_c)
+        s_h_c = self.master_step / np.sqrt((step_tol * ones) + self.hw_h_c)
 
-    def update_weights(self, w0, w1, w2):
-        self.weight0 -= w0
-        self.weight1 -= w1
-        self.weight2 -= w2
+        s_x_o = self.master_step / np.sqrt((step_tol * ones) + self.hw_x_o)
+        s_h_o = self.master_step / np.sqrt((step_tol * ones) + self.hw_h_o)
+        s_c_o = self.master_step / np.sqrt((step_tol * ones) + self.hw_c_o)
+        s_o = self.master_step / np.sqrt((step_tol * ones) + self.hb_o)
+
+        self.w_x_i -= np.square(self.w_x_i) * g_x_i
+        self.w_h_i -= np.square(self.w_h_i) * g_h_i
+        self.w_c_i -= np.square(self.w_c_i) * g_c_i
+        self.b_i -= np.square(self.b_i) * g_i
+
+        self.w_x_f -= np.square(self.w_x_f) * g_x_f
+        self.w_h_f -= np.square(self.w_h_f) * g_h_f
+        self.w_c_f -= np.square(self.w_c_f) * g_c_f
+        self.b_f -= np.square(self.b_f) * g_f
+
+        self.w_x_c -= np.square(self.w_x_c) * g_x_c
+        self.w_h_c -= np.square(self.w_h_c) * g_h_c
+
+        self.w_x_o -= np.square(self.w_x_o) * g_x_o
+        self.w_h_o -= np.square(self.w_h_o) * g_h_o
+        self.w_c_o -= np.square(self.w_c_o) * g_c_o
+        self.b_o -= np.square(self.b_o) * g_o
+
+        self.archive_sq_weights()
+
+    def archive_sq_weights(self):
+        self.hw_x_i += np.square(self.w_x_i)
+        self.hw_h_i += np.square(self.w_h_i)
+        self.hw_c_i += np.square(self.w_c_i)
+        self.hb_i += np.square(self.b_i)
+
+        self.hw_x_f += np.square(self.w_x_f)
+        self.hw_h_f += np.square(self.w_h_f)
+        self.hw_c_f += np.square(self.w_c_f)
+        self.hb_f += np.square(self.b_f)
+
+        self.hw_x_c += np.square(self.w_x_c)
+        self.hw_h_c += np.square(self.w_h_c)
+
+        self.hw_x_o += np.square(self.w_x_o)
+        self.hw_h_o += np.square(self.w_h_o)
+        self.hw_c_o += np.square(self.w_c_o)
+        self.hb_o += np.square(self.b_o)
