@@ -234,52 +234,81 @@ class LSTM:
         ff_sequence, act_i_seq, gate_i_seq, act_f_seq, gate_f_seq, act_c_seq, cell_seq, act_o_seq, gate_o_seq, hidden_seq, output_seq = self.ff_seq(sequence)
 
         # delta & gradients for the output gate
-        delta_o = np.zeros(seq_shape)
-        g_x_o = np.zeros(seq_shape)
-        g_h_o = np.zeros(seq_shape)
-        g_c_o = np.zeros(seq_shape)
-        g_o = np.zeros(seq_shape)
+        delta_o = np.zeros(self.data_len)
+        g_x_o = np.zeros(self.data_len)
+        g_h_o = np.zeros(self.data_len)
+        g_c_o = np.zeros(self.data_len)
+        g_o = np.zeros(self.data_len)
 
         # delta & gradients for the cell state, and a fast link to the cell state
-        delta_c = np.zeros(seq_shape)
-        g_x_c = np.zeros(seq_shape)
-        g_h_c = np.zeros(seq_shape)
-        g_c = np.zeros(seq_shape)
+        delta_c = np.zeros(self.data_len)
+        g_x_c = np.zeros(self.data_len)
+        g_h_c = np.zeros(self.data_len)
+        g_c = np.zeros(self.data_len)
         
         # link = np.zeros(seq_shape)
 
         # delta & gradients for the forget gate
-        delta_f = np.zeros(seq_shape)
-        g_x_f = np.zeros(seq_shape)
-        g_h_f = np.zeros(seq_shape)
-        g_c_f = np.zeros(seq_shape)
-        g_f = np.zeros(seq_shape)
+        delta_f = np.zeros(self.data_len)
+        g_x_f = np.zeros(self.data_len)
+        g_h_f = np.zeros(self.data_len)
+        g_c_f = np.zeros(self.data_len)
+        g_f = np.zeros(self.data_len)
 
 
         # delta & gradients for the input gate
-        delta_i = np.zeros(seq_shape)
-        g_x_i = np.zeros(seq_shape)
-        g_h_i = np.zeros(seq_shape)
-        g_c_i = np.zeros(seq_shape)
-        g_i = np.zeros(seq_shape)
+        delta_i = np.zeros(self.data_len)
+        g_x_i = np.zeros(self.data_len)
+        g_h_i = np.zeros(self.data_len)
+        g_c_i = np.zeros(self.data_len)
+        g_i = np.zeros(self.data_len)
 
+        # these are the terms used to get the partial derivatives from the t=1
+        # elem as well
+        jump_h = np.zeros(self.data_len)
+        jump_c = np.zeros(self.data_len)
+        res1 = np.zeros(self.data_len)
+        # Now with more 80/81 character limit
+        # >tfw mobile coding
         for t in xrange(seq_len, -1, -1):
-            data = ff_seq[t-1,:]
+            data = ff_seq[t,:]
             target = sequence[t,:]
-            res = output_seq[t,:] - target
+            res0 = hidden_seq[t+1,:] - target
+            start = res0 + jump_h
 
-            delta_o[t,:] = res * tanh(cell_seq[t,:]) * dsig(act_o_seq[t,:])
-            g_x_o[t,:] = delta_o[t,:] * data
-            g_h_o[t,:] = delta_o[t,:] * hidden_seq[t-1,:]
-            g_c_o[t,:] = delta_o[t,:] * cell_seq[t,:]
-            g_o[t,:] = delta_o[t,:]
+            delta_o = start * dsig(act_o[t,:])
+            g_x_o += delta_o * data
+            g_h_o += delta_o * hidden_seq[t,:]
+            g_c_o += delta_o * cell_seq[t,:]
+            g_o += delta_o
 
-            arg1 = tanh(cell_seq[t,:]) * dsig(act_o_seq[t,:]) * self.w_c_o
-            arg2 = gate_o[t,:] * dtanh(cell_seq[t,:])
-            link = res * (arg1 +
-            delta_c[t,:] = 
-            
-            
+            link = tanh(cell[t,:]) * dsig(act_o_seq[t,:] * self.w_c_o
+            link += gate_o_seq[t,:] * dtanh(cell[t,:])
+
+            start = (start + jump_c)
+
+            delta_c = start * gate_i_seq[t,:] * dsig(act_c_seq[t,:])
+            g_x_c += delta_o * data
+            g_h_c += delta_o * hidden_seq[t,:]
+            g_c += delta_c
+
+            delta_f = start * cell_seq[t-1,:] * dsig(act_f_seq[t,:])
+            g_x_f += delta_f * data
+            g_h_f += delta_f * hidden_seq[t,:]
+            g_c_f += delta_f * cell_seq[t,:]
+            g_f += delta_f
+
+            delta_i = start * tanh(act_c[t,:]) * dsig(act_i[t,:])
+            g_x_i += delta_i * data
+            g_h_i += delta_i * hidden_seq[t,:]
+            g_c_i += delta_i * cell_seq[t,:]
+            g_i += delta_i
+
+            jump_h = delta_o * self.w_h_o + delta_c * self.w_h_c 
+            jump_h += delta_f * self.w_h_f + delta_i * self.w_h_i
+            jump_c = link * gate_f[i,:] + delta_f * self.w_c_f
+            jump_c += delta_i * self.w_c_i
+            res1 = np.copy(res0)
  
     def bptt(self, sequence):
         if len(sequence[0]) != self.data_len:
