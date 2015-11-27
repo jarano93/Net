@@ -10,6 +10,7 @@ def dtanh(x):
     return 1 - pow(np.tanh(x), 2)
 
 def sig(x):
+    np.seterr(over='raise', under='raise')
     if type(x) == float or type(x) == int or type(x) == np.float64:
         if x > 2e2:
             return 1
@@ -32,7 +33,18 @@ def sig(x):
                 else:
                     result[i] = n / (1 + math.exp(-val))
             return result
-    
+        except:
+            result = np.zeros(len(x))
+            for i in xrange(n):
+                val = x[i]
+                if val > 4e2:
+                    result[i] = n
+                elif val < -4e2:
+                    result[i] = 0
+                else:
+                    result[i] = n / (1 + math.exp(-val))
+            return result
+
 def dsig(x):
     return sig(x) * (1 - sig(x))
 
@@ -155,7 +167,7 @@ class MemeFFNN():
                 delta1[k] += delta2[l] * self.hmap1[k]
             if abs(delta1[k]) < 1e-8:
                 delta1[k] = 0
-            k_product[k] = delta1[l] * dsig(self.activation1[k])
+            k_product[k] = delta1[k] * dsig(self.activation1[k])
             if abs(k_product[k]) < 1e-6:
                 k_product[k] = 0
             for j in xrange(self.layer0_len + 1):
@@ -181,6 +193,7 @@ class MemeFFNN():
                     grad0[i,j] = 0
 
         del delta0, delta1, delta2, k_product, j_product, target_array
+        # print 'clear!'
         return grad0, grad1, grad2
 
     # Snake?
@@ -196,7 +209,9 @@ class MemeFFNN():
         return mean_sq_err(self.forgetforward(data), np.array(target))
  
     def set_meansq(self, dataset, targetset):
-        if len(dataset) != len(targetset):
+        if dataset.shape[0] != targetset.shape[0]:
+            print dataset.shape
+            print targetset.shape
             raise ValueError("Need equal matching length sets!")
         n = len(dataset)
         output = np.zeros(targetset.shape)
@@ -265,7 +280,7 @@ class MemeFFNN():
         if verbose:
             print "update mean square error: %f" % (min_err)
 
-    def train_set(self, trainset, targetset, trust, verbose=False, rands=500):
+    def train_set(self, trainset, targetset, trust, verbose=False, rands=100):
         # now with more copypasting
         start_w0, start_w1, start_w2 = self.get_weights()
         best_w0 , best_w1 , best_w2 = self.get_weights()
@@ -283,7 +298,7 @@ class MemeFFNN():
 
         local_err = 0
         for i in xrange(trainset.shape[0]):
-            cand0, cand1, cand2 = self.grad_candidates(trainset[i], targetset[i])
+            cand0, cand1, cand2 = self.grad_candidates(trainset[i,:], targetset[i,:])
             for s0 in steps:
                 for s1 in steps:
                     for s2 in steps:
@@ -296,6 +311,7 @@ class MemeFFNN():
                                 return
                             if local_err < min_err:
                                 min_err = local_err
+                                # print min_err
                                 best_w0, best_w1, best_w2 = self.get_weights()
                             self.set_weights(start_w0, start_w1, start_w2)
         # print 'rands'
@@ -322,6 +338,7 @@ class MemeFFNN():
                         if local_err < min_err:
                             # print 'r'
                             min_err = local_err
+                            # print min_err
                             best_w0, best_w1, best_w2 = self.get_weights()
                         self.set_weights(start_w0, start_w1, start_w2)
         self.set_weights(best_w0, best_w1, best_w2)

@@ -8,7 +8,10 @@ def hot(val, hot_len):
     return onehot
 
 def key(oh):
-    val = np.nonzero(a)
-    if len(val) > 1:
-        raise ValueError("input not onehot!")
+    val = np.argmax(oh)
+    try:
+        if len(val) > 1:
+            raise ValueError("input not onehot!")
+    except TypeError:
+        break
     return val
