@@ -1,0 +1,19 @@
+So, I finish ff_seq with all the activations, gate states, cell states, and
+output as an ND array
+
+outputs and cell states are 1 longer than everything else because I need to look
+back (during both FF & BPTT also)
+
+the t-th output of the lstm gets compared during bptt directly with the t-th
+sequence since a zero vector gets fed first into the lstm, and then after that
+the sequence gets fed in
+
+during BPTT I want to do as I wrote out on the loose leaf paper.
+Start at the end of the sequence(T-th), and go back to the 0-th (first elem)
+
+since cell state & hidden outputs are 1 longer than all other sequences go from
+the T+1-th elem to the second elem( 1st)
+
+I do NOT need to store the deltas in a np.array((seq_len, data_len))
+Use additive assignment instead breh
+
