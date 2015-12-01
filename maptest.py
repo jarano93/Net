@@ -7,7 +7,7 @@ import pymod.prep as prep
 import pymod.img as img
 import pickle
 
-num_principals = 10
+num_principals = 5
 trust = 0
 N = 100
 
@@ -39,31 +39,31 @@ target2 = target[0:100, 100:200, :].flatten()
 target3 = target[100:200, 100:200, :].flatten()
 
 elevmap0 = prep.pca(elevmap0, num_principals).T
-elev0 = prep.pca(elevmap0, num_principals).T.flatten()
+elev0 = prep.pca(elevmap0, num_principals).flatten()
 elevmap1 = prep.pca(elevmap1, num_principals).T
-elev1 = prep.pca(elevmap1, num_principals).T.flatten()
+elev1 = prep.pca(elevmap1, num_principals).flatten()
 elevmap2 = prep.pca(elevmap2, num_principals).T
-elev2 = prep.pca(elevmap2, num_principals).T.flatten()
+elev2 = prep.pca(elevmap2, num_principals).flatten()
 elevmap3 = prep.pca(elevmap3, num_principals).T
-elev3 = prep.pca(elevmap3, num_principals).T.flatten()
+elev3 = prep.pca(elevmap3, num_principals).flatten()
 
 landmap0 = prep.pca(landmap0, num_principals).T
-land0 = prep.pca(elevmap0, num_principals).T.flatten()
+land0 = prep.pca(elevmap0, num_principals).flatten()
 landmap1 = prep.pca(landmap1, num_principals).T
-land1 = prep.pca(elevmap1, num_principals).T.flatten()
+land1 = prep.pca(elevmap1, num_principals).flatten()
 landmap2 = prep.pca(landmap2, num_principals).T
-land2 = prep.pca(elevmap2, num_principals).T.flatten()
+land2 = prep.pca(elevmap2, num_principals).flatten()
 landmap3 = prep.pca(landmap3, num_principals).T
-land3 = prep.pca(elevmap3, num_principals).T.flatten()
+land3 = prep.pca(elevmap3, num_principals).flatten()
 
 roadmap0 = prep.pca(roadmap0, num_principals).T
-road0 = prep.pca(roadmap0, num_principals).T.flatten()
+road0 = prep.pca(roadmap0, num_principals).flatten()
 roadmap1 = prep.pca(roadmap1, num_principals).T
-road1 = prep.pca(roadmap1, num_principals).T.flatten()
+road1 = prep.pca(roadmap1, num_principals).flatten()
 roadmap2 = prep.pca(roadmap2, num_principals).T
-road2 = prep.pca(roadmap2, num_principals).T.flatten()
+road2 = prep.pca(roadmap2, num_principals).flatten()
 roadmap3 = prep.pca(roadmap3, num_principals).T
-road3 = prep.pca(roadmap3, num_principals).T.flatten()
+road3 = prep.pca(roadmap3, num_principals).flatten()
 
 dataset = np.vstack((
     np.hstack((elev0, land0, road0)),
@@ -75,9 +75,9 @@ dataset = np.vstack((
 targetset = np.vstack((target0, target1, target2, target3))
 
 # print dataset.shape
-net = MemeFFNN(len(dataset[0]), len(target0), 300, 200)
+net = MemeFFNN(len(dataset[0]), len(target0), 100, 300)
 print "initial set mean square error: %f" % (net.set_meansq(dataset, targetset))
-net.train_set_N(dataset, targetset, trust, N, True, 250)
+net.train_set_N(dataset, targetset, trust, N, True, 400)
 
 fhandle = file('net.pkl', 'wb')
 pickle.dump(net, fhandle)

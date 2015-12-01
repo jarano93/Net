@@ -7,7 +7,7 @@ import pymod.onehot as oh
 
 sample_size = 200
 
-f = open('twcset.txt', 'r')
+f = open('twcshort.txt', 'r')
 str_dataset = f.read()
 seq_length = len(str_dataset)
 cc = CCodec(str_dataset)
@@ -22,7 +22,7 @@ lstm = LSTM(num_uniques)
 
 lstm.seq_loss(dataset)
 while True:
-    lstm.train_N(dataset, 5)
+    lstm.train_N(dataset, 100)
     out = lstm.sample(sample_size)
     res = []
     for i in xrange(sample_size):

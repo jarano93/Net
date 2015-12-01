@@ -12,9 +12,9 @@ def dtanh(x):
 def sig(x):
     np.seterr(over='raise', under='raise')
     if type(x) == float or type(x) == int or type(x) == np.float64:
-        if x > 2e2:
+        if x > 4e2:
             return 1
-        elif x < -2e2:
+        elif x < -4e2:
             return 0
         else:
             return 1 / (1 + math.exp(-x))
@@ -27,22 +27,22 @@ def sig(x):
             for i in xrange(n):
                 val = x[i]
                 if val > 4e2:
-                    result[i] = n
+                    result[i] = 1
                 elif val < -4e2:
                     result[i] = 0
                 else:
-                    result[i] = n / (1 + math.exp(-val))
+                    result[i] = 1 / (1 + math.exp(-val))
             return result
         except:
             result = np.zeros(len(x))
             for i in xrange(n):
                 val = x[i]
                 if val > 4e2:
-                    result[i] = n
+                    result[i] = 1
                 elif val < -4e2:
                     result[i] = 0
                 else:
-                    result[i] = n / (1 + math.exp(-val))
+                    result[i] = 1 / (1 + math.exp(-val))
             return result
 
 def dsig(x):
@@ -291,7 +291,7 @@ class MemeFFNN():
                 print "set mean square error: %f" % (min_err)
             return
 
-        mags = np.linspace(-2, -5, 3)
+        mags = np.linspace(2, -4, 7)
         mags = np.power(10, mags)
         leads = np.linspace(1, 5, 2)
         steps = np.outer(leads, mags).flatten()
@@ -315,7 +315,7 @@ class MemeFFNN():
                                 best_w0, best_w1, best_w2 = self.get_weights()
                             self.set_weights(start_w0, start_w1, start_w2)
         # print 'rands'
-        rsteps = np.linspace(1, -2, 4)
+        rsteps = np.linspace(2, -2, 5)
         rsteps = np.power(10, rsteps)
         methods = range(2)
         div = 100
@@ -392,8 +392,11 @@ class MemeFFNN():
     
     def update_weights(self, s0, w0, s1, w1, s2, w2):
         self.weight0 -= s0 * w0
+        del s0, w0
         self.weight1 -= s1 * w1
+        del s1, w1
         self.weight2 -= s2 * w2
+        del s2, w2
 
     def grad_descent(self, indata, target, step0, step1, step2):
         self.feedforward(indata, False)

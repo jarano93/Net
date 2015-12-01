@@ -13,5 +13,5 @@ def key(oh):
         if len(val) > 1:
             raise ValueError("input not onehot!")
     except TypeError:
-        break
+        0
     return val
