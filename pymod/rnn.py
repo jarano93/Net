@@ -5,10 +5,11 @@ import math as m
 import onehot as oh
 import help as h
 
+#TODO debug & test
 
 class RNN:
 
-    def __init__(self, data_len, hid0_len, hid1_len):
+    def __init__(self, data_len, hid0_len, hid1_len): # OK
         self.data_len = data_len
         self.hid0_len = hid0_len
         self.hid1_len = hid1_len
@@ -32,7 +33,7 @@ class RNN:
 
         self.zero()
 
-    def ff(self, data):
+    def ff(self, data): # OK
         if len(data) != self.data_len:
             raise ValueError("Unexpected data length during ff")
 
@@ -65,7 +66,7 @@ class RNN:
         self.prob = h.softmax(self.y)
         return self.prob
 
-    # this ain't right. I need to use three ff caches
+    # this ain't right. I need to use three ff caches -- DONE(?)
     def bptt(self, sequence)
         # for sequence, rows are the individual datapoints in the sequence
         if len(sequence[0]) != self.data_len:
@@ -114,8 +115,8 @@ class RNN:
 
         # gamma vals for cur
         y_gamma = (prob_cur - sequence[0])
-        h1_gamma = h.vt_mult(y_gamma, self.w_y_hid1)
-        h0_gamma = h.vt_mult(h1_gamma, self.w_h1_hid0)
+        h1_gamma = h.vt_mult(y_gamma * h.dtanh(act_y_cur), self.w_y_hid1)
+        h0_gamma = h.vt_mult(h1_gamma * h.dtanh(act_h1_cur), self.w_h1_hid0)
 
         # epsilon vals for future
         y_epsilon = np.zeros(self.data_len)
@@ -128,6 +129,11 @@ class RNN:
         h1_delta = np.zeros(self.hid1_len)
         h0_delta = np.zeros(self.hid0_len)
 
+        # GET MAX LENGTHS FOR INNERMOST FOR LOOPS NOW faster this way
+        max_len_y = np.amax((data_len, hid1_len))
+        max_len_h1 = np.amax((data_len, hid0_len, hid1_len))
+        max_len_h0 = np.amax((data_len, hid0_len)
+
         for t in xrange(seq_len - 1):
             # feedforward for the t+1 data
             self.ff(sequence[t])
@@ -138,9 +144,8 @@ class RNN:
             y_epsilon = (self.prob - seq)
             y_delta = y_epsilon * h.vt_mult(h.dtanh(self.act_h1), self.w_y_self)
             y_delta = (y_gammma + y_delta) * h.dtanh(act_y_cur)
-            max_len = np.amax((data_len, hid1_len))
             for i in xrange(data_len):
-                for j in xrange(max_len):
+                for j in xrange(max_len_y):
                     if j < hid1_len:
                         self.g_y_hid1[i,j] += y_delta[i] * self.hid1[j]
                     if j < data_len
@@ -149,12 +154,11 @@ class RNN:
                         self.g_y_prob[i,j] += y_delta[i] * prob_old[j]
                 self.g_y_bias[i] += y_delta[i]
 
-            h1_epsilon = h.vt_mult((y_epsilon * h.dtanh(self.act_y)), self.w_y_hid1)
+            h1_epsilon = h.vt_mult(y_epsilon * h.dtanh(self.act_y), self.w_y_hid1)
             h1_delta = h1_epsilon * h.vt_mult(h.dtanh(self.act_h1), self.w_h1_self)
             h1_delta = (h1_gamma + h1_delta) * h.dtanh(act_h1_cur)
-            max_len = np.amax((data_len, hid0_len, hid1_len))
             for i in xrange(hid1_len):
-                for j in xrange(max_len):
+                for j in xrange(max_len_h1):
                     if j < hid0_len:
                         self.g_h1_hid0[i] += h1_delta[i] * self.hid0[j]
                     if j < data_len:
@@ -164,12 +168,11 @@ class RNN:
                         self.g_h1_self[i] += h1_delta[i] * hid1_old[j]
                 self.g_h1_bias[i] += h1_delta[i]
 
-            h0_epsilon = h.vt_mult((h1_epsilon * h.dtanh(self.act_h1)), self.w_h1_hid0)
+            h0_epsilon = h.vt_mult(h1_epsilon * h.dtanh(self.act_h1), self.w_h1_hid0)
             h0_delta = h0_epsilon * h.vt_mult(h.dtanh(self.act_h0), self.w_h0_self)
             h0_delta = (h1_gamma + h0_delta) * h.dtanh(act_h0_cur)
-            max_len = np.amax((data_len, hid0_len))
             for i in xrange(hid0_len):
-                for j in xrange(max_len):
+                for j in xrange(max_len_h0):
                     if j < data_len:
                         self.g_h0_data[i] += h0_delta[i] * data[j]
                         self.g_h0_prob[i] += h0_delta[i] * prob_old[j]
@@ -199,13 +202,13 @@ class RNN:
             prob_cur = self.prob
 
             data = seq[t]
+            # ENDFOR
 
         # and then bp for T'th stuff alone
         # don't need to ff again
         y_delta = y_gamma * h.dtanh(self.act_y)
-        max_len = np.amax((data_len, hid1_len))
         for i in xrange(data_len):
-            for j in xrange(max_len):
+            for j in xrange(max_len_y):
                 if j < hid1_len:
                     self.g_y_hid1[i,j] += y_delta[i] * self.hid1[j]
                 if j < data_len:
@@ -215,9 +218,8 @@ class RNN:
             self.g_y_bias[i] += y_delta[i]
 
         h1_delta = h1_gamma * h.dtanh(self.act_h1)
-        max_len = np.amax((data_len, hid0_len, hid1_len))
         for i in xrange(hid1_len):
-            for j in xrange(max_len):
+            for j in xrange(max_len_h1):
                 if j < hid0_len:
                     self.g_h1_hid0[i] += h1_delta[i] * self.hid0[j]
                 if j < data_len:
@@ -228,9 +230,8 @@ class RNN:
             self.g_h1_bias[i] += h1_delta[i]
 
         h0_delta = h0_gamma * h.dtanh(self.act_h0)
-        max_len = np.amax((data_len, hid0_len))
         for i in xrange(hid0_len):
-            for j in xrange(max_len):
+            for j in xrange(max_len_h0):
                 if j < data_len:
                     self.g_h0_data[i] += h0_delta[i] * data[j]
                     self.g_h0_prob[i] += h0_delta[i] * prob_old[j]
@@ -238,7 +239,7 @@ class RNN:
                     self.g_h0_self[i] += h0_delta[i] * hid0_old[j]
             self.g_h0_bias[i] += h0_delta[i]
 
-    def sample(self, sample_len):
+    def sample(self, sample_len): # OK
         self.zero()
         gen_sample = np.zeros((sample_len, self.data_len))
         seed = np.zeros(self.data_len)
@@ -264,7 +265,7 @@ class RNN:
         self.zero()
         return loss
 
-    def train_N(self, sequence, step_size, momentum, N, verbose):
+    def train_N(self, sequence, step_size, momentum, N, verbose): # OK
         self.momentum_zero()
         for i in xrange(N):
             self.bptt(sequence)
@@ -272,7 +273,7 @@ class RNN:
             if verbose:
                 print "current sequence loss: %f" % (loss)
 
-    def train_LOSS(self, sequence, step_size, momentum, LOSS, verbose):
+    def train_LOSS(self, sequence, step_size, momentum, LOSS, verbose): # OK
         self.momentum_zero()
         loss = self.seq_loss(sequence, verbose)
         while loss > LOSS:
@@ -282,25 +283,49 @@ class RNN:
             if verbose:
                 print "current sequence loss: %f" % (loss)
 
-    # momentum must be [0,1
-    def momentum_desc(self, step_size, momentum):
-        self.w_h0_data -= step_size * self.g_h0_data + momentum * self.m_h0_data
-        self.w_h0_self -= step_size * self.g_h0_self + momentum * self.m_h0_self
-        self.w_h0_prob -= step_size * self.g_h0_prob + momentum * self.m_h0_prob
-        self.w_h0_bias -= step_size * self.g_h0_bias + momentum * self.m_h0_bias
+    # momentum must be [0,1)
+    def momentum_desc(self, step_size, momentum): # OK
+        # IDK if this is as efficient tbh fam
+        self.grad_desc(step_size)
 
-        self.w_h1_hid0 -= step_size * self.g_h1_hid0 + momentum * self.m_h1_hid0
-        self.w_h1_data -= step_size * self.g_h1_data + momentum * self.m_h1_data
-        self.w_h1_self -= step_size * self.g_h1_self + momentum * self.m_h1_self
-        self.w_h1_prob -= step_size * self.g_h1_prob + momentum * self.m_h1_prob
-        self.w_h1_bias -= step_size * self.g_h1_bias + momentum * self.m_h1_bias
+        self.w_h0_data -= momentum * self.m_h0_data
+        self.w_h0_self -= momentum * self.m_h0_self
+        self.w_h0_prob -= momentum * self.m_h0_prob
+        self.w_h0_bias -= momentum * self.m_h0_bias
 
-        self.w_y_hid1 -= step_size *  self.g_y_hid1 + momentum * self.w_y_hid1
-        self.w_y_data -= step_size *  self.g_y_data + momentum * self.w_y_data
-        self.w_y_self -= step_size *  self.g_y_self + momentum * self.w_y_self
-        self.w_y_prob -= step_size *  self.g_y_prob + momentum * self.w_y_prob
-        self.w_y_bias -= step_size *  self.g_y_bias + momentum * self.w_y_bias
+        self.w_h1_hid0 -= momentum * self.m_h1_hid0
+        self.w_h1_data -= momentum * self.m_h1_data
+        self.w_h1_self -= momentum * self.m_h1_self
+        self.w_h1_prob -= momentum * self.m_h1_prob
+        self.w_h1_bias -= momentum * self.m_h1_bias
 
+        self.w_y_hid1 -= momentum * self.m_y_hid1
+        self.w_y_data -= momentum * self.m_y_data
+        self.w_y_self -= momentum * self.m_y_self
+        self.w_y_prob -= momentum * self.m_y_prob
+        self.w_y_bias -= momentum * self.m_y_bias
+
+        self.cache_momentum(step_size)
+
+    def grad_desc(self, step_size):
+        self.w_h0_data -= step_size * self.g_h0_data
+        self.w_h0_self -= step_size * self.g_h0_self
+        self.w_h0_prob -= step_size * self.g_h0_prob
+        self.w_h0_bias -= step_size * self.g_h0_bias
+
+        self.w_h1_hid0 -= step_size * self.g_h1_hid0
+        self.w_h1_data -= step_size * self.g_h1_data
+        self.w_h1_self -= step_size * self.g_h1_self
+        self.w_h1_prob -= step_size * self.g_h1_prob
+        self.w_h1_bias -= step_size * self.g_h1_bias
+
+        self.w_y_hid1 -= step_size * self.g_y_hid1
+        self.w_y_data -= step_size * self.g_y_data
+        self.w_y_self -= step_size * self.g_y_self
+        self.w_y_prob -= step_size * self.g_y_prob
+        self.w_y_bias -= step_size * self.g_y_bias
+
+    def cache_momentum(self, step_size): # OK
         self.m_h0_data = step_size * self.g_h0_data
         self.m_h0_self = step_size * self.g_h0_self
         self.m_h0_prob = step_size * self.g_h0_prob
@@ -312,13 +337,13 @@ class RNN:
         self.m_h1_prob = step_size * self.g_h1_prob
         self.m_h1_bias = step_size * self.g_h1_bias
 
-        self.m_y_hid1 =  step_size *  self.g_y_hid1
-        self.m_y_data =  step_size *  self.g_y_data
-        self.m_y_self =  step_size *  self.g_y_self
-        self.m_y_prob =  step_size *  self.g_y_prob
-        self.m_y_bias =  step_size *  self.g_y_bias
+        self.m_y_hid1 =  step_size * self.g_y_hid1
+        self.m_y_data =  step_size * self.g_y_data
+        self.m_y_self =  step_size * self.g_y_self
+        self.m_y_prob =  step_size * self.g_y_prob
+        self.m_y_bias =  step_size * self.g_y_bias
 
-    def zero(self):
+    def zero(self): # OK
         self.act_h0 = np.zeros(self.hid0_len)
         self.hid0 = np.zeros(self.hid0_len)
 
@@ -330,7 +355,7 @@ class RNN:
 
         self.prob = np.zeros(self.data_len)
 
-    def momentum_zero(self):
+    def momentum_zero(self): # OK as long as init stays the same
         self.m_h0_data = np.zeros((hid0_len, data_len))
         self.m_h0_self = np.zeros((hid0_len, hid0_len))
         self.m_h0_prob = np.zeros((hid0_len, data_len))
