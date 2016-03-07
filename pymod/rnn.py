@@ -15,22 +15,22 @@ class RNN:
         self.hid0_len = hid0_len
         self.hid1_len = hid1_len
 
-        self.w_h0_data = h.rand_ND((hid0_len, data_len))
-        self.w_h0_self = h.rand_ND((hid0_len, hid0_len))
-        self.w_h0_prob = h.rand_ND((hid0_len, data_len))
-        self.w_h0_bias = h.rand_ND(hid0_len)
+        self.w_h0_data = 0.1 * h.rand_ND((hid0_len, data_len))
+        self.w_h0_self = 0.1 * h.rand_ND((hid0_len, hid0_len))
+        self.w_h0_prob = 0.1 * h.rand_ND((hid0_len, data_len))
+        self.w_h0_bias = 0.5 * h.rand_ND(hid0_len)
 
-        self.w_h1_hid0 = h.rand_ND((hid1_len, hid0_len))
-        self.w_h1_data = h.rand_ND((hid1_len, data_len))
-        self.w_h1_self = h.rand_ND((hid1_len, hid1_len))
-        self.w_h1_prob = h.rand_ND((hid1_len, data_len))
-        self.w_h1_bias = h.rand_ND(hid1_len)
+        self.w_h1_hid0 = 0.1 * h.rand_ND((hid1_len, hid0_len))
+        self.w_h1_data = 0.1 * h.rand_ND((hid1_len, data_len))
+        self.w_h1_self = 0.1 * h.rand_ND((hid1_len, hid1_len))
+        self.w_h1_prob = 0.1 * h.rand_ND((hid1_len, data_len))
+        self.w_h1_bias = 0.5 * h.rand_ND(hid1_len)
 
-        self.w_y_hid1 = h.rand_ND((data_len, hid1_len))
-        self.w_y_data = h.rand_ND((data_len, data_len))
-        self.w_y_self = h.rand_ND((data_len, data_len))
-        self.w_y_prob = h.rand_ND((data_len, data_len))
-        self.w_y_bias = h.rand_ND(data_len)
+        self.w_y_hid1 = 0.1 * h.rand_ND((data_len, hid1_len))
+        self.w_y_data = 0.1 * h.rand_ND((data_len, data_len))
+        self.w_y_self = 0.1 * h.rand_ND((data_len, data_len))
+        self.w_y_prob = 0.1 * h.rand_ND((data_len, data_len))
+        self.w_y_bias = 0.5 * h.rand_ND(data_len)
 
         self.zero()
 
@@ -131,10 +131,11 @@ class RNN:
         h0_delta = np.zeros(self.hid0_len)
 
         # GET MAX LENGTHS FOR INNERMOST FOR LOOPS NOW faster this way
-        max_len_y = np.amax((self.data_len, self.hid1_len))
-        max_len_h1 = np.amax((self.data_len, self.hid0_len, self.hid1_len))
-        max_len_h0 = np.amax((self.data_len, self.hid0_len))
+        max_len_y = int(np.amax((self.data_len, self.hid1_len)))
+        max_len_h1 = int(np.amax((self.data_len, self.hid0_len, self.hid1_len)))
+        max_len_h0 = int(np.amax((self.data_len, self.hid0_len)))
         for t in xrange(seq_len - 1):
+            # print t
             # feedforward for the t+1 data
             self.ff(sequence[t])
             # seq_cur = sequence[t]
@@ -142,13 +143,13 @@ class RNN:
 
             # bptt here
             y_epsilon = (self.prob - seq)
-            y_delta = y_epsilon * h.vt_mult(h.dtanh(self.act_h1), self.w_y_self)
-            y_delta = (y_gammma + y_delta) * h.dtanh(act_y_cur)
-            for i in xrange(data_len):
+            y_delta = y_epsilon * h.vt_mult(h.dtanh(self.act_y), self.w_y_self)
+            y_delta = (y_gamma + y_delta) * h.dtanh(act_y_cur)
+            for i in xrange(self.data_len):
                 for j in xrange(max_len_y):
-                    if j < hid1_len:
+                    if j < self.hid1_len:
                         self.g_y_hid1[i,j] += y_delta[i] * self.hid1[j]
-                    if j < data_len:
+                    if j < self.data_len:
                         self.g_y_data[i,j] += y_delta[i] * data[j]
                         self.g_y_self[i,j] += y_delta[i] * y_old[j]
                         self.g_y_prob[i,j] += y_delta[i] * prob_old[j]
@@ -157,26 +158,26 @@ class RNN:
             h1_epsilon = h.vt_mult(y_epsilon * h.dtanh(self.act_y), self.w_y_hid1)
             h1_delta = h1_epsilon * h.vt_mult(h.dtanh(self.act_h1), self.w_h1_self)
             h1_delta = (h1_gamma + h1_delta) * h.dtanh(act_h1_cur)
-            for i in xrange(hid1_len):
+            for i in xrange(self.hid1_len):
                 for j in xrange(max_len_h1):
-                    if j < hid0_len:
+                    if j < self.hid0_len:
                         self.g_h1_hid0[i] += h1_delta[i] * self.hid0[j]
-                    if j < data_len:
+                    if j < self.data_len:
                         self.g_h1_data[i] += h1_delta[i] * data[j]
                         self.g_h1_prob[i] += h1_delta[i] * prob_old[j]
-                    if j < hid1_len:
+                    if j < self.hid1_len:
                         self.g_h1_self[i] += h1_delta[i] * hid1_old[j]
                 self.g_h1_bias[i] += h1_delta[i]
 
             h0_epsilon = h.vt_mult(h1_epsilon * h.dtanh(self.act_h1), self.w_h1_hid0)
             h0_delta = h0_epsilon * h.vt_mult(h.dtanh(self.act_h0), self.w_h0_self)
-            h0_delta = (h1_gamma + h0_delta) * h.dtanh(act_h0_cur)
-            for i in xrange(hid0_len):
+            h0_delta = (h0_gamma + h0_delta) * h.dtanh(act_h0_cur)
+            for i in xrange(self.hid0_len):
                 for j in xrange(max_len_h0):
-                    if j < data_len:
+                    if j < self.data_len:
                         self.g_h0_data[i] += h0_delta[i] * data[j]
                         self.g_h0_prob[i] += h0_delta[i] * prob_old[j]
-                    if j < hid0_len:
+                    if j < self.hid0_len:
                         self.g_h0_self[i] += h0_delta[i] * hid0_old[j]
                 self.g_h0_bias[i] += h0_delta[i]
 
@@ -201,41 +202,41 @@ class RNN:
 
             prob_cur = self.prob
 
-            data = seq[t]
+            data = seq
             # ENDFOR
 
         # and then bp for T'th stuff alone
         # don't need to ff again
         y_delta = y_gamma * h.dtanh(self.act_y)
-        for i in xrange(data_len):
+        for i in xrange(self.data_len):
             for j in xrange(max_len_y):
-                if j < hid1_len:
+                if j < self.hid1_len:
                     self.g_y_hid1[i,j] += y_delta[i] * self.hid1[j]
-                if j < data_len:
+                if j < self.data_len:
                     self.g_y_data[i,j] += y_delta[i] * data[j]
                     self.g_y_self[i,j] += y_delta[i] * y_old[j]
                     self.g_y_prob[i,j] += y_delta[i] * prob_old[j]
             self.g_y_bias[i] += y_delta[i]
 
         h1_delta = h1_gamma * h.dtanh(self.act_h1)
-        for i in xrange(hid1_len):
+        for i in xrange(self.hid1_len):
             for j in xrange(max_len_h1):
-                if j < hid0_len:
+                if j < self.hid0_len:
                     self.g_h1_hid0[i] += h1_delta[i] * self.hid0[j]
-                if j < data_len:
+                if j < self.data_len:
                     self.g_h1_data[i] += h1_delta[i] * data[j]
                     self.g_h1_prob[i] += h1_delta[i] * prob_old[j]
-                if j < hid1_len:
+                if j < self.hid1_len:
                     self.g_h1_self[i] += h1_delta[i] * hid1_old[j]
             self.g_h1_bias[i] += h1_delta[i]
 
         h0_delta = h0_gamma * h.dtanh(self.act_h0)
-        for i in xrange(hid0_len):
+        for i in xrange(self.hid0_len):
             for j in xrange(max_len_h0):
-                if j < data_len:
+                if j < self.data_len:
                     self.g_h0_data[i] += h0_delta[i] * data[j]
                     self.g_h0_prob[i] += h0_delta[i] * prob_old[j]
-                if j < hid0_len:
+                if j < self.hid0_len:
                     self.g_h0_self[i] += h0_delta[i] * hid0_old[j]
             self.g_h0_bias[i] += h0_delta[i]
 
@@ -269,17 +270,17 @@ class RNN:
         self.momentum_zero()
         for i in xrange(N):
             self.bptt(sequence)
-            self.momentum_descent(step_size, momentum)
+            self.grad_desc(step_size)
             if verbose:
-                print "current sequence loss: %f" % (loss)
+                loss = self.seq_loss(sequence)
 
     def train_LOSS(self, sequence, step_size, momentum, LOSS, verbose=True): # OK
         self.momentum_zero()
         loss = self.seq_loss(sequence, verbose)
         while loss > LOSS:
             self.bptt(sequence)
-            self.momentum_descent(step_size, momentum)
-            loss = self.seq_loss(sequence)
+            self.momentum_desc(step_size, momentum)
+            loss = self.seq_loss(sequence, False)
             if verbose:
                 print "current sequence loss: %f" % (loss)
 

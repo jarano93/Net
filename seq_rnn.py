@@ -5,15 +5,15 @@ from pymod.rnn import RNN as RNN
 from pymod.char import CharCodec as CCodec
 import pymod.onehot as oh
 
-iteration = 100
+iteration = 5
 
 sample_size = 200
 
-step_size = 1e-2
-momentum = 5e-1
+step_size = 5e-3
+momentum = 5e-2
 
-hid0 = 200
-hid1 = 300
+hid0 = 10
+hid1 = 20
 
 f = open('twcshort.txt', 'r')
 str_dataset = f.read().lower()

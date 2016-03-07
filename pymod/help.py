@@ -101,8 +101,8 @@ def mv_mult(matrix, vector):
 def vt_mult(vector, matrix):
     #transpose the matrix while multiplying
     if len(vector) != matrix.shape[0]:
-        raise ValueError("Outer dimensions do not match for mv_mult")
+        raise ValueError("Outer dimensions do not match for vt_mult")
     res = np.zeros(matrix.shape[1])
     for i in xrange(matrix.shape[1]):
-        res[i] = np.vdot(vector, matrix[i]) # REMEMBER, IT'S TRANSPOSED
+        res[i] = np.vdot(vector, matrix[:,i]) # REMEMBER, IT'S TRANSPOSED
     return res
