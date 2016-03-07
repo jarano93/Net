@@ -54,10 +54,10 @@ class RNN:
             self.act_h1[i] += self.w_h1_bias[i]
         self.hid1 = h.tanh(self.act_h1)
 
-        self.act_y = np.zeros(self.y_len)
-        for i in xrange(self.y_len):
+        self.act_y = np.zeros(self.data_len)
+        for i in xrange(self.data_len):
             self.act_y[i] = np.vdot(self.w_y_hid1[i], self.hid1)
-            self.act_y[i] = np.vdot(self.w_y_data[i], self.data)
+            self.act_y[i] = np.vdot(self.w_y_data[i], data)
             self.act_y[i] = np.vdot(self.w_y_self[i], self.y)
             self.act_y[i] = np.vdot(self.w_y_prob[i], self.prob)
             self.act_y[i] += self.w_y_bias[i]
@@ -67,29 +67,29 @@ class RNN:
         return self.prob
 
     # this ain't right. I need to use three ff caches -- DONE(?)
-    def bptt(self, sequence)
+    def bptt(self, sequence):
         # for sequence, rows are the individual datapoints in the sequence
         if len(sequence[0]) != self.data_len:
             raise ValueError("Unexpected data length during bptt")
         self.zero()
         seq_len = len(sequence)
 
-        self.g_h0_data = np.zeros((hid0_len, data_len))
-        self.g_h0_self = np.zeros((hid0_len, hid0_len))
-        self.g_h0_prob = np.zeros((hid0_len, data_len))
-        self.g_h0_bias = np.zeros((hid0_len, 1))
+        self.g_h0_data = np.zeros((self.hid0_len, self.data_len))
+        self.g_h0_self = np.zeros((self.hid0_len, self.hid0_len))
+        self.g_h0_prob = np.zeros((self.hid0_len, self.data_len))
+        self.g_h0_bias = np.zeros(self.hid0_len)
 
-        self.g_h1_hid0 = np.zeros((hid1_len, hid0_len))
-        self.g_h1_data = np.zeros((hid1_len, data_len))
-        self.g_h1_self = np.zeros((hid1_len, hid1_len))
-        self.g_h1_prob = np.zeros((hid1_len, data_len))
-        self.g_h1_bias = np.zeros((hid1_len, 1))
+        self.g_h1_hid0 = np.zeros((self.hid1_len, self.hid0_len))
+        self.g_h1_data = np.zeros((self.hid1_len, self.data_len))
+        self.g_h1_self = np.zeros((self.hid1_len, self.hid1_len))
+        self.g_h1_prob = np.zeros((self.hid1_len, self.data_len))
+        self.g_h1_bias = np.zeros(self.hid1_len)
 
-        self.g_y_hid1 = np.zeros((data_len, hid1_len))
-        self.g_y_data = np.zeros((data_len, data_len))
-        self.g_y_self = np.zeros((data_len, data_len))
-        self.g_y_prob = np.zeros((data_len, data_len))
-        self.g_y_bias = np.zeros((data_len, 1))
+        self.g_y_hid1 = np.zeros((self.data_len, self.hid1_len))
+        self.g_y_data = np.zeros((self.data_len, self.data_len))
+        self.g_y_self = np.zeros((self.data_len, self.data_len))
+        self.g_y_prob = np.zeros((self.data_len, self.data_len))
+        self.g_y_bias = np.zeros(self.data_len)
 
         # sequential values initialization
         # old doesn't need the activations
@@ -98,10 +98,10 @@ class RNN:
         y_old = np.zeros(self.data_len)
         prob_old = np.zeros(self.data_len)
 
-        data = np.zeros(data_len)
+        data = np.zeros(self.data_len)
 
         # current(cur) DOES need the activations
-        ff_res_cur = self.ff(np.zeros(data_len))
+        ff_res_cur = self.ff(np.zeros(self.data_len))
         act_h0_cur = self.act_h0
         hid0_cur = self.hid0
 
@@ -130,10 +130,9 @@ class RNN:
         h0_delta = np.zeros(self.hid0_len)
 
         # GET MAX LENGTHS FOR INNERMOST FOR LOOPS NOW faster this way
-        max_len_y = np.amax((data_len, hid1_len))
-        max_len_h1 = np.amax((data_len, hid0_len, hid1_len))
-        max_len_h0 = np.amax((data_len, hid0_len)
-
+        max_len_y = np.amax((self.data_len, self.hid1_len))
+        max_len_h1 = np.amax((self.data_len, self.hid0_len, self.hid1_len))
+        max_len_h0 = np.amax((self.data_len, self.hid0_len))
         for t in xrange(seq_len - 1):
             # feedforward for the t+1 data
             self.ff(sequence[t])
@@ -148,7 +147,7 @@ class RNN:
                 for j in xrange(max_len_y):
                     if j < hid1_len:
                         self.g_y_hid1[i,j] += y_delta[i] * self.hid1[j]
-                    if j < data_len
+                    if j < data_len:
                         self.g_y_data[i,j] += y_delta[i] * data[j]
                         self.g_y_self[i,j] += y_delta[i] * y_old[j]
                         self.g_y_prob[i,j] += y_delta[i] * prob_old[j]
@@ -265,7 +264,7 @@ class RNN:
         self.zero()
         return loss
 
-    def train_N(self, sequence, step_size, momentum, N, verbose): # OK
+    def train_N(self, sequence, step_size, momentum, N, verbose=True): # OK
         self.momentum_zero()
         for i in xrange(N):
             self.bptt(sequence)
@@ -273,7 +272,7 @@ class RNN:
             if verbose:
                 print "current sequence loss: %f" % (loss)
 
-    def train_LOSS(self, sequence, step_size, momentum, LOSS, verbose): # OK
+    def train_LOSS(self, sequence, step_size, momentum, LOSS, verbose=True): # OK
         self.momentum_zero()
         loss = self.seq_loss(sequence, verbose)
         while loss > LOSS:
@@ -356,19 +355,19 @@ class RNN:
         self.prob = np.zeros(self.data_len)
 
     def momentum_zero(self): # OK as long as init stays the same
-        self.m_h0_data = np.zeros((hid0_len, data_len))
-        self.m_h0_self = np.zeros((hid0_len, hid0_len))
-        self.m_h0_prob = np.zeros((hid0_len, data_len))
-        self.m_h0_bias = np.zeros(hid0_len)
+        self.m_h0_data = np.zeros((self.hid0_len, self.data_len))
+        self.m_h0_self = np.zeros((self.hid0_len, self.hid0_len))
+        self.m_h0_prob = np.zeros((self.hid0_len, self.data_len))
+        self.m_h0_bias = np.zeros(self.hid0_len)
 
-        self.m_h1_hid0 = np.zeros((hid1_len, hid0_len))
-        self.m_h1_data = np.zeros((hid1_len, data_len))
-        self.m_h1_self = np.zeros((hid1_len, hid1_len))
-        self.m_h1_prob = np.zeros((hid1_len, data_len))
-        self.m_h1_bias = np.zeros(hid1_len)
+        self.m_h1_hid0 = np.zeros((self.hid1_len, self.hid0_len))
+        self.m_h1_data = np.zeros((self.hid1_len, self.data_len))
+        self.m_h1_self = np.zeros((self.hid1_len, self.hid1_len))
+        self.m_h1_prob = np.zeros((self.hid1_len, self.data_len))
+        self.m_h1_bias = np.zeros(self.hid1_len)
 
-        self.m_y_hid1 = np.zeros((data_len, hid1_len))
-        self.m_y_data = np.zeros((data_len, data_len))
-        self.m_y_self = np.zeros((data_len, data_len))
-        self.m_y_prob = np.zeros((data_len, data_len))
-        self.m_y_bias = np.zeros(data_len)
+        self.m_y_hid1 = np.zeros((self.data_len, self.hid1_len))
+        self.m_y_data = np.zeros((self.data_len, self.data_len))
+        self.m_y_self = np.zeros((self.data_len, self.data_len))
+        self.m_y_prob = np.zeros((self.data_len, self.data_len))
+        self.m_y_bias = np.zeros(self.data_len)
