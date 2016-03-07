@@ -79,3 +79,28 @@ def w_mult(args):
         except FloatingPointError:
             pass
     return res
+
+def pairs_vdot(pairs):
+    if len(pairs[0]) != 2:
+        raise ValueError("pairs_vdot takes pairwise arguments")
+    res = 0
+    for i in xrange(len(pairs)):
+        res += np.vdot(pairs[i][0], pairs[i][1])
+    return res
+
+def mv_mult(matrix, vector):
+    if matrix.shape[1] != len(vector):
+        raise ValueError("Inner dimensions do not match for mv_mult")
+    res = np.zeros(matrix.shape[0])
+    for i in xrange(matrix.shape[0]):
+        res[i] = np.vdot(matrix[i], vector)
+    return res
+
+def vt_mult(vector, matrix):
+    #transpose the matrix while multiplying
+    if len(vector) != matrix.shape[0]:
+        raise ValueError("Outer dimensions do not match for mv_mult")
+    res = np.zeros(matrix.shape[1])
+    for i in xrange(matrix.shape[1]):
+        res[i] = np.vdot(vector, matrix[i]) # REMEMBER, IT'S TRANSPOSED
+    return res
