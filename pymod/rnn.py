@@ -5,7 +5,8 @@ import math as m
 import onehot as oh
 import help as h
 
-#TODO debug & test
+#TODO ROLLBACK
+#   tbh, I'll prolly write a new class that FINALLY incorporates rollback
 
 class RNN:
 

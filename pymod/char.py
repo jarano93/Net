@@ -4,6 +4,7 @@ import numpy as np
 
 class CharCodec():
     def __init__(self, string):
+        self.sequence = string
         self.chars = list(set(string))
         self.num_chars = len(self.chars)
         self.charkeys = dict(zip(self.chars, range(self.num_chars)))
@@ -24,8 +25,8 @@ class CharCodec():
             res_str[i] = self.char(num_array[i])
         return ''.join(res_str)
         
-    def sequence(self, string):
-        seq = np.zeros(len(string))
-        for i in xrange(len(string)):
-            seq[i] = self.num(string[i])
+    def sequence(self):
+        seq = np.zeros(self.sequence)
+        for i in xrange(len(self.sequence)):
+            seq[i] = self.num(self.sequence[i])
         return seq

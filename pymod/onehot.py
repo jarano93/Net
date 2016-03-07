@@ -2,8 +2,13 @@
 
 import numpy as np
 
-def hot(val, hot_len):
+def hrow(val, hot_len):
     onehot = np.zeros(hot_len)
+    onehot[int(val)] = 1
+    return onehot
+
+def hcol(val, hot_len):
+    onehot = np.zeros((hot_len,1))
     onehot[int(val)] = 1
     return onehot
 
