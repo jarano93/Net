@@ -7,9 +7,6 @@ def rand_ND(shape):
     # dude, typing np.random.random_sample is not fun
     return np.random.random_sample(shape)
 
-def randn_ND(*shape):
-    return np.random.randn(*shape)
-
 def log_sum(*elems):
     return np.sum(np.log10(np.fabs(np.array(elems))))
 
