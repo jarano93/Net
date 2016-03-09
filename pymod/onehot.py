@@ -23,10 +23,10 @@ def key(oh):
 
 def hcol_seq(seq, hot_len):
     seq_len = len(seq)
-    onehot = np.zeros(seq_len, hot_len)
+    onehot = np.zeros((hot_len, seq_len))
     for t in xrange(seq_len):
         val = int(seq[t])
-        if val = -1:
+        if val == -1:
             continue # skip this iteration
-        onehot[t, val] = 1
+        onehot[val, t] = 1
     return onehot

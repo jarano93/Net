@@ -19,7 +19,7 @@ f = open('twcshort.txt', 'r')
 str_dataset = f.read().lower()
 seq_length = len(str_dataset)
 cc = CCodec(str_dataset)
-int_dataset = cc.sequence(str_dataset)
+int_dataset = cc.sequence()
 
 num_uniques = cc.length()
 dataset = np.zeros((seq_length, num_uniques))
