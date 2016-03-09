@@ -7,7 +7,6 @@ import onehot as oh
 class PerRec:
 
 
-    # good
     def __init__(self, x_len, h_len, weight_scale, prob=False):
         self.x_len = x_len
         self.h_len = h_len
@@ -22,15 +21,15 @@ class PerRec:
         self.w_y_h = weight_scale * nr.randn(x_len, h_len)
         self.w_y_b =  np.zeros((x_len, 1))
 
-        self.h = np.zeros((h_len, 1))
-        self.p = np.zeros((x_len, 1))
+        self.reset_states()
 
-
-        self.clip_mag = 10
+        # set model params
+        self.clip_mag = 5
         self.rollback_len = 100
         self.freq = 100
         self.sample_len = 1000
         self.step_size = 1e-1
+        self.text = False
 
 
     # good
@@ -61,9 +60,7 @@ class PerRec:
         for t in xrange(seq_len):
             x_seq[t] = dataseq[:,t:t+1]
             key = self.ff(x_seq[t])
-            h_seq[t] = self.h
-            y_seq[t] = self.y
-            p_seq[t] = self.p
+            h_seq[t], y_seq[t], p_seq[t] = self.h, self.y, self.p
             loss -= np.log(self.p[key])
 
         # set up grads
@@ -87,9 +84,9 @@ class PerRec:
             delta_h = np.dot(self.w_y_h.T, delta_y) + h_epsilon
             delta_h = (1 - np.square(h_seq[t])) * delta_h
             self.g_h_x += np.dot(delta_h, x_seq[t].T)
-            self.g_h_h += np.dot(delta_h, h_seq[t].T)
+            self.g_h_h += np.dot(delta_h, h_seq[t-1].T)
             if self.prob:
-                self.g_h_p += np.dot(delta_h, p_seq[t].T) # prob
+                self.g_h_p += np.dot(delta_h, p_seq[t-1].T) # prob
             self.g_h_b += delta_h
 
             # prep for next iteration
@@ -179,8 +176,8 @@ class PerRec:
             key = int(np.argmax(seed))
             if self.text:
                 print self.char_sample(seed, self.sample_len, self.sample)
-                print "\n\nseed: %s, N: %d, smoothloss: %f\n\n" % (self.cc.char(key), n, smoothloss)
                 # print self.sample_debug(seed, self.sample_len, self.sample)
+                print "\n\nseed: %s, N: %d, smoothloss: %f\n\n" % (self.cc.char(key), n, smoothloss)
             else:
                 print self.sample(seed, self.sample_len)
                 print "\n\nseed: %d N: %d, smoothloss: %f\n\n" % (key, n, smoothloss)

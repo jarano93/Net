@@ -10,22 +10,27 @@ import onehot as oh
 class RNN:
 
 
-    def __init__(self, in_len, h0_len, h1_len):
+    def __init__(self, in_len, h0_len, h1_len, w_scale, prob=False, peek=False):
+        self.prob = prob
+        self.peek = peek
+
         self.in_len = in_len
         self.h0_len = h0_len
         self.h1_len = h1_len
 
-        self.w_h0_x = 0.01 * nr.randn(h0_len, in_len)
-        self.w_h0_h0 = 0.01 * nr.randn(h0_len, h0_len)
-        # self.w_h0_p = 0.01 * nr.randn(h0_len, in_len) # prob
+        self.w_h0_x = w_scale * nr.randn(h0_len, in_len)
+        self.w_h0_h0 = w_scale * nr.randn(h0_len, h0_len)
+        if self.prob:
+            self.w_h0_p = w_scale * nr.randn(h0_len, in_len) # prob
         self.w_h0_b = np.zeros((h0_len, 1))
 
-        self.w_h1_h0 = 0.01 * nr.randn(h1_len, h0_len)
-        self.w_h1_h1 = 0.01 * nr.randn(h1_len, h1_len)
-        # self.w_h1_x = 0.01 * nr.randn(h1_len, in_len) # peek
+        self.w_h1_h0 = w_scale * nr.randn(h1_len, h0_len)
+        self.w_h1_h1 = w_scale * nr.randn(h1_len, h1_len)
+        if self.peek:
+            self.w_h1_x = w_scale * nr.randn(h1_len, in_len) # peek
         self.w_h1_b = np.zeros((h1_len, 1))
 
-        self.w_y_h1 = 0.01 * nr.randn(in_len, h1_len)
+        self.w_y_h1 = w_scale * nr.randn(in_len, h1_len)
         self.w_y_b =  np.zeros((in_len, 1))
 
         self.h0 = np.zeros((self.h0_len, 1))
@@ -44,12 +49,14 @@ class RNN:
         # DATA MUST BE A COL VECTOR
         h0_arg = np.dot(self.w_h0_x, data)
         h0_arg += np.dot(self.w_h0_h0, self.h0) 
-        # h0_arg += np.dot(self.w_h0_p, self.p) # prob
+        if self.prob:
+            h0_arg += np.dot(self.w_h0_p, self.p) # prob
         self.h0 = np.tanh(h0_arg + self.w_h0_b)
 
         h1_arg = np.dot(self.w_h1_h0, self.h0)
         h1_arg += np.dot(self.w_h1_h1, self.h1)
-        # h1_arg += np.dot(self.w_h1_x, data) # peek
+        if self.peek:
+            h1_arg += np.dot(self.w_h1_x, data) # peek
         self.h1 = np.tanh(h1_arg + self.w_h1_b)
 
         self.y = np.dot(self.w_y_h1, self.h1) + self.w_y_b
@@ -80,12 +87,14 @@ class RNN:
         # set up grads
         self.g_h0_x = np.zeros_like(self.w_h0_x)
         self.g_h0_h0 = np.zeros_like(self.w_h0_h0)
-        # self.g_h0_p = np.zeros_like(self.w_h0_p) # prob
+        if self.prob:
+            self.g_h0_p = np.zeros_like(self.w_h0_p) # prob
         self.g_h0_b = np.zeros_like(self.w_h0_b)
 
         self.g_h1_h0 = np.zeros_like(self.w_h1_h0)
         self.g_h1_h1 = np.zeros_like(self.w_h1_h1)
-        # self.g_h1_x = np.zeros_like(self.w_h1_x) # peek
+        if self.peek:
+            self.g_h1_x = np.zeros_like(self.w_h1_x) # peek
         self.g_h1_b = np.zeros_like(self.w_h1_b)
 
         self.g_y_h1 = np.zeros_like(self.w_y_h1)
@@ -103,15 +112,17 @@ class RNN:
             delta_h1 = np.dot(self.w_y_h1.T, delta_y) + h1_epsilon
             delta_h1 = (1 - np.square(h1_seq[t])) * delta_h1
             self.g_h1_h0 += np.dot(delta_h1, h0_seq[t].T)
-            self.g_h1_h1 += np.dot(delta_h1, h1_seq[t].T)
-            # self.g_h1_x += np.dot(delta_h1, x_seq[t].T) # peek
+            self.g_h1_h1 += np.dot(delta_h1, h1_seq[t-1].T)
+            if self.peek:
+                self.g_h1_x += np.dot(delta_h1, x_seq[t].T) # peek
             self.g_h1_b += delta_h1
 
             delta_h0 = np.dot(self.w_h1_h0.T, delta_h1) + h0_epsilon
             delta_h0 = (1 - np.square(h0_seq[t])) * delta_h0
             self.g_h0_x += np.dot(delta_h0, x_seq[t].T)
-            self.g_h0_h0 += np.dot(delta_h0, h0_seq[t].T)
-            # self.g_h0_p += np.dot(delta_h0, p_seq[t].T) # prob
+            self.g_h0_h0 += np.dot(delta_h0, h0_seq[t-1].T)
+            if self.prob:
+                self.g_h0_p += np.dot(delta_h0, p_seq[t-1].T) # prob
             self.g_h0_b += delta_h0
 
             # prep for next iteration
@@ -119,19 +130,22 @@ class RNN:
             h0_epsilon = np.dot(self.w_h0_h0.T, delta_h0)
 
         # clip to mitigate exploding gradients
-        for grad in [
-            self.g_h0_x,
-            self.g_h0_h0,
-            # self.g_h0_p, # prob
-            self.g_h0_b,
-            self.g_h1_h0,
-            self.g_h1_h1,
-            # self.g_h1_x, # peek
-            self.g_h1_b,
-            self.g_y_h1,
-            self.g_y_b
-            ]:
-            np.clip(grad, -self.clip_mag, self.clip_mag, out=grad)
+        grad = [
+                self.g_h0_x,
+                self.g_h0_h0,
+                self.g_h0_b,
+                self.g_h1_h0,
+                self.g_h1_h1,
+                self.g_h1_b,
+                self.g_y_h1,
+                self.g_y_b
+            ]
+        if self.prob:
+            grad += [self.g_h0_p]
+        if self.peek:
+            grad += [self.g_h1_x]
+        for g in grad:
+            np.clip(g, -self.clip_mag, self.clip_mag, out=g)
 
         return loss #, h0_seq[seq_len-1], h1_seq[seq_len-1] <-- in self
 
@@ -207,12 +221,14 @@ class RNN:
 
         if verbose and n % self.freq == 0:
             seed = data_sub[:,0:1]
+            key = np.argmax(seed)
             if self.text:
                 print self.char_sample(seed, self.sample_len, self.sample)
                 # print self.sample_debug(seed, self.sample_len, self.sample)
+                print "\n\nseed: %s, N: %d, smoothloss: %f\n\n" % (self.cc.char(key), n, smoothloss)
             else:
                 print self.sample(seed, self.sample_len)
-            print "\n\nN: %d, smoothloss: %f\n\n" % (n, smoothloss)
+                print "\n\nseed: %d, N: %d, smoothloss: %f\n\n" % (key, n, smoothloss)
             print "- - - - - - - - - - - - - - -\n\n"
 
         loss = self.bptt(data_sub, target_sub)
@@ -223,27 +239,32 @@ class RNN:
 
 
     def adagrad(self):
-        for weight, grad, mem in zip(
-            [
-                self.w_h0_x, self.w_h0_h0, self.w_h0_b, # self.w_h0_p,
-                self.w_h1_h0, self.w_h1_h1, self.w_h1_b, # self.w_h1_x, 
+        weight = [
+                self.w_h0_x, self.w_h0_h0, self.w_h0_b,
+                self.w_h1_h0, self.w_h1_h1, self.w_h1_b,
                 self.w_y_h1, self.w_y_b
-            ],
-            [
-                self.g_h0_x, self.g_h0_h0, self.g_h0_b, # self.g_h0_p, 
-                self.g_h1_h0, self.g_h1_h1, self.g_h1_b, # self.g_h1_x, 
-                self.g_y_h1, self.g_y_b,
-            ],
-            [
-                self.m_h0_x, self.m_h0_h0, self.m_h0_b, # self.m_h0_p, 
-                self.m_h1_h0, self.m_h1_h1, self.m_h1_b, # self.m_h1_x, 
+            ]
+        grad = [
+                self.g_h0_x, self.g_h0_h0, self.g_h0_b,
+                self.g_h1_h0, self.g_h1_h1, self.g_h1_b,
+                self.g_y_h1, self.g_y_b
+            ]
+        mem = [
+                self.m_h0_x, self.m_h0_h0, self.m_h0_b,
+                self.m_h1_h0, self.m_h1_h1, self.m_h1_b,
                 self.m_y_h1, self.m_y_b
             ]
-        ):
-            mem += np.square(grad)
-            weight -= self.step_size * grad / np.sqrt(mem + 1e-8)
-            # perturb the weights
-            # weight *= (1.0 + 0.01 * nr.randn(weight.shape[0], weight.shape[1]))
+        if self.prob:
+            weight += [self.w_h0_p]
+            grad += [self.g_h0_p]
+            mem +=  [self.m_h0_p]
+        if self.peek:
+            weight += [self.w_h1_x]
+            grad += [self.g_h1_x]
+            mem +=  [self.m_h1_x]
+        for w, g, m in zip(weight, grad, mem):
+            m += np.square(g)
+            w -= self.step_size * g / np.sqrt(m + 1e-8)
 
 
     def reset_states(self):
@@ -255,12 +276,14 @@ class RNN:
     def reset_mem(self):
         self.m_h0_x = np.zeros_like(self.w_h0_x)
         self.m_h0_h0 = np.zeros_like(self.w_h0_h0)
-        # self.m_h0_p = np.zeros_like(self.w_h0_p) # prob
+        if self.prob:
+            self.m_h0_p = np.zeros_like(self.w_h0_p) # prob
         self.m_h0_b = np.zeros_like(self.w_h0_b)
 
         self.m_h1_h0 = np.zeros_like(self.w_h1_h0)
         self.m_h1_h1 = np.zeros_like(self.w_h1_h1)
-        # self.m_h1_x = np.zeros_like(self.w_h1_x) # peek
+        if self.peek:
+            self.m_h1_x = np.zeros_like(self.w_h1_x) # peek
         self.m_h1_b = np.zeros_like(self.w_h1_b)
 
         self.m_y_h1 = np.zeros_like(self.w_y_h1)
