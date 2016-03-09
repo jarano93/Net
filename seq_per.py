@@ -1,6 +1,6 @@
 #!usr/bin/python
 
-from pymod.prn import PerRec as PerRec
+from pymod.per import PerRec as PerRec
 from pymod.char import CharCodec as CCodec
 
 
