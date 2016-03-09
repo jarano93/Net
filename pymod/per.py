@@ -4,20 +4,22 @@ import numpy as np
 import numpy.random as nr
 import onehot as oh
 
-def PerRec:
+class PerRec:
 
 
     # good
-    def __init__(self, x_len, h_len):
+    def __init__(self, x_len, h_len, weight_scale, prob=False):
         self.x_len = x_len
         self.h_len = h_len
+        self.prob = prob
 
-        self.w_h_x = 0.1 * randn(h_len, x_len)
-        self.w_h_h = 0.1 * randn(h_len, h_len)
-        self.w_h_p = 0.1 * randn(h_len, x_len) # prob
+        self.w_h_x = weight_scale * nr.randn(h_len, x_len)
+        self.w_h_h = weight_scale * nr.randn(h_len, h_len)
+        if prob:
+            self.w_h_p = weight_scale * nr.randn(h_len, x_len) # prob
         self.w_h_b = np.zeros((h_len, 1))
 
-        self.w_y_h = 0.01 * randn(x_len, h_len)
+        self.w_y_h = weight_scale * nr.randn(x_len, h_len)
         self.w_y_b =  np.zeros((x_len, 1))
 
         self.h = np.zeros((h_len, 1))
@@ -35,8 +37,9 @@ def PerRec:
     def ff(self, data):
         # DATA MUST BE A COL VECTOR
         h_arg = np.dot(self.w_h_x, data)
-        h_arg += np.dot(self.w_h_h0, self.h) 
-        h_arg += np.dot(self.w_h_p, self.p) # prob
+        h_arg += np.dot(self.w_h_h, self.h) 
+        if self.prob:
+            h_arg += np.dot(self.w_h_p, self.p) # prob
         self.h = np.tanh(h_arg + self.w_h_b)
 
         self.y = np.dot(self.w_y_h, self.h) + self.w_y_b
@@ -66,7 +69,8 @@ def PerRec:
         # set up grads
         self.g_h_x = np.zeros_like(self.w_h_x)
         self.g_h_h = np.zeros_like(self.w_h_h)
-        self.g_h_p = np.zeros_like(self.w_h_p) # prob
+        if self.prob:
+            self.g_h_p = np.zeros_like(self.w_h_p) # prob
         self.g_h_b = np.zeros_like(self.w_h_b)
 
         self.g_y_h = np.zeros_like(self.w_y_h)
@@ -84,22 +88,19 @@ def PerRec:
             delta_h = (1 - np.square(h_seq[t])) * delta_h
             self.g_h_x += np.dot(delta_h, x_seq[t].T)
             self.g_h_h += np.dot(delta_h, h_seq[t].T)
-            self.g_h_p += np.dot(delta_h, p_seq[t].T) # prob
+            if self.prob:
+                self.g_h_p += np.dot(delta_h, p_seq[t].T) # prob
             self.g_h_b += delta_h
 
             # prep for next iteration
             h_epsilon = np.dot(self.w_h_h.T, delta_h)
 
         # clip to mitigate exploding gradients
-        for grad in [
-                self.g_h_x,
-                self.g_h_h,
-                # self.g_h_p, # prob
-                self.g_h_b,
-                self.g_y_h,
-                self.g_y_b
-            ]:
-            np.clip(grad, -self.clip_mag, self.clip_mag, out=grad)
+        grad =  [ self.g_h_x, self.g_h_h, self.g_h_b, self.g_y_h, self.g_y_b]
+        if self.prob:
+            grad += [self.g_h_p]
+        for g in grad:
+            np.clip(g, -self.clip_mag, self.clip_mag, out=g)
 
         return loss #, h0_seq[seq_len-1], h1_seq[seq_len-1] <-- in self
 
@@ -175,12 +176,14 @@ def PerRec:
 
         if verbose and n % self.freq == 0:
             seed = data_sub[:,0:1]
+            key = int(np.argmax(seed))
             if self.text:
                 print self.char_sample(seed, self.sample_len, self.sample)
+                print "\n\nseed: %s, N: %d, smoothloss: %f\n\n" % (self.cc.char(key), n, smoothloss)
                 # print self.sample_debug(seed, self.sample_len, self.sample)
             else:
                 print self.sample(seed, self.sample_len)
-            print "\n\nN: %d, smoothloss: %f\n\n" % (n, smoothloss)
+                print "\n\nseed: %d N: %d, smoothloss: %f\n\n" % (key, n, smoothloss)
             print "- - - - - - - - - - - - - - -\n\n"
 
         loss = self.bptt(data_sub, target_sub)
@@ -191,22 +194,16 @@ def PerRec:
 
 
     def adagrad(self):
-        for weight, grad, mem in zip(
-            [
-                self.w_h_x, self.w_h_h, self.w_h_b, self.w_h_p,
-                self.w_y_h, self.w_y_b
-            ],
-            [
-                self.g_h_x, self.g_h_h, self.g_h_b, self.g_h_p, 
-                self.g_y_h1, self.g_y_b,
-            ],
-            [
-                self.m_h_x, self.m_h_h, self.m_h_b, self.m_h_p, 
-                self.m_y_h, self.m_y_b
-            ]
-        ):
-            mem += np.square(grad)
-            weight -= self.step_size * grad / np.sqrt(mem + 1e-8)
+        weight = [self.w_h_x, self.w_h_h, self.w_h_b, self.w_y_h, self.w_y_b] 
+        grad = [self.g_h_x, self.g_h_h, self.g_h_b, self.g_y_h, self.g_y_b]
+        mem = [self.m_h_x, self.m_h_h, self.m_h_b, self.m_y_h, self.m_y_b]
+        if self.prob:
+            weight += [self.w_h_p]
+            grad += [self.g_h_p]
+            mem  += [self.m_h_p]
+        for w, g, m in zip(weight, grad, mem):
+            m += np.square(g)
+            w -= self.step_size * g / np.sqrt(m + 1e-8)
             # perturb the weights
             # weight *= (1.0 + 0.01 * nr.randn(weight.shape[0], weight.shape[1]))
 
@@ -218,8 +215,9 @@ def PerRec:
 
     def reset_mem(self):
         self.m_h_x = np.zeros_like(self.w_h_x)
-        self.m_h_h = np.zeros_like(self.w_h_h0)
-        self.m_h_p = np.zeros_like(self.w_h_p) # prob
+        self.m_h_h = np.zeros_like(self.w_h_h)
+        if self.prob:
+            self.m_h_p = np.zeros_like(self.w_h_p) # prob
         self.m_h_b = np.zeros_like(self.w_h_b)
 
         self.m_y_h = np.zeros_like(self.w_y_h)
