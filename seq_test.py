@@ -61,15 +61,6 @@ def ff(data, h_state):
     prob = prob_common / np.sum(prob_common)
     return hid, y, prob # don't return h_act b/c using tanh derivative
 
-# remove this
-def adagrad(param, grad, mem):
-    '''
-        performs adagrad to update the net
-        after update caches grad in mem
-        returns mem
-    '''
-    pass
-
 def train(dataseq, targets, h_state, clip_val):
     '''
         trains a net on a subset of the entire datasequence
