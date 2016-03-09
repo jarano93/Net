@@ -37,11 +37,13 @@ step_size = 1e-1
 clip_mag = 10
 
 # model params
-W_x_h = 0.01 * nr.randn(hid_len, uni_chars)
-W_h_h = 0.01 * nr.randn(hid_len, hid_len)
-W_h_y = 0.01 * nr.randn(uni_chars, hid_len)
-b_h = nr.randn(hid_len, 1)
-b_y = nr.randn(uni_chars, 1)
+W_x_h = 0.1 * nr.randn(hid_len, uni_chars)
+W_h_h = 0.1 * nr.randn(hid_len, hid_len)
+W_h_y = 0.1 * nr.randn(uni_chars, hid_len)
+b_h = np.zeros((hid_len, 1))
+b_y = np.zeros((uni_chars, 1))
+# b_h = 0.01 * nr.randn(hid_len, 1)
+# b_y = 0.01 * nr.randn(uni_chars, 1)
 
 def ff(data, h_state):
     '''
@@ -83,10 +85,11 @@ def train(dataseq, targets, h_state, clip_val):
     seq_len = dataseq.shape[1]
     # I don't think I need x_seq
     # REMEMBER, WE'RE USING DICTS NOW
-    h_seq, y_seq, p_seq = {}, {}, {}
+    x_seq, h_seq, y_seq, p_seq = {}, {}, {}, {}
     h_seq[-1] = np.copy(h_state)
     loss = 0
     for t in xrange(seq_len):
+        x_seq[t] = dataseq[:,t:t+1]
         h_seq[t], y_seq[t], p_seq[t] = ff(dataseq[:,t], h_seq[t-1])
         loss -= np.log(p_seq[t][np.argmax(targets[:,t])])
 
@@ -170,7 +173,7 @@ while True:
     if n % sample_freq == 0:
         print "N = %d, smoothloss = %f\n\nSAMPLE:\n" % (n, smooth_loss)
         sample(data_sub[:,0], h_state, sample_len, cc) 
-        print "\n\n"
+        print "\n\n- - - - - - - - - - -\n\n"
 
     loss, G_x_h, G_h_h, G_h_y, g_h, g_y, h_state = train(data_sub, target_sub, h_state, clip_mag)
     smooth_loss = smooth_loss * 0.999 + loss * 0.001
