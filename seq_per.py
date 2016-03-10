@@ -20,7 +20,7 @@ print "%d unique characters in dataset\n\n" % uni_chars
 pr = PerRec(uni_chars, h_len, weight_scale, True)
 # rnn.set_freq(50)
 pr.set_sample_len(800)
-pr.set_rollback(200)
+pr.set_rollback(50)
 pr.set_clip(10)
 pr.set_codec(cc)
 # pr.train_TOL(int_dataset, 5)

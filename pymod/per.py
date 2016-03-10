@@ -59,7 +59,8 @@ class PerRec:
 
         for t in xrange(seq_len):
             x_seq[t] = dataseq[:,t:t+1]
-            key = self.ff(x_seq[t])
+            self.ff(x_seq[t])
+            key = np.argmax(targets[:,t])
             h_seq[t], y_seq[t], p_seq[t] = self.h, self.y, self.p
             loss -= np.log(self.p[key])
 

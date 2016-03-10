@@ -77,7 +77,8 @@ class RNN:
 
         for t in xrange(seq_len):
             x_seq[t] = dataseq[:,t:t+1]
-            key = self.ff(x_seq[t])
+            self.ff(x_seq[t])
+            key = np.argmax(targets[:,t])
             h0_seq[t] = self.h0
             h1_seq[t] = self.h1
             y_seq[t] = self.y
