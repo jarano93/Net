@@ -92,9 +92,8 @@ class LSTM:
 
 
     # feedforward data through the network
-    def ff(self, data):
-        if if len(data) != self.x_len:
-            raise ValueError("Unexpected data dimension for feedforward")
+    def ff(self, x):
+        data = oh.hcol(x, self.x_len)
 
         i_arg = self.w_x_i * data + self.w_h_i * self.hidden + self.w_c_i * self.cell
         i_arg += self.w_i
