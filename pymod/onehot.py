@@ -4,11 +4,15 @@ import numpy as np
 
 def hrow(val, hot_len):
     onehot = np.zeros(hot_len)
+    if val == -1:
+        return onehot
     onehot[int(val)] = 1
     return onehot
 
 def hcol(val, hot_len):
     onehot = np.zeros((hot_len,1))
+    if val == -1:
+        return onehot
     onehot[int(val)] = 1
     return onehot
 

@@ -28,11 +28,11 @@ class LSTM:
     # LSTM grids
     # LSTM cubes
     # LSTM hypercubes
-    def __init__(self, x_len):
+    def __init__(self, x_len, w_scale):
         self.x_len = int(x_len)
 
         # stores the most recent sequence data given to the LSTM
-        self.x = -1
+        self.x = np.zeros((x_len, 1))
 
 
         # model hyperparams
@@ -56,60 +56,59 @@ class LSTM:
         # its output gets fed into LSTM1
 
         # defines the input gate, the argument of its activation function, and the biases and weights used to calculate it
-        self.gate_i = np.zeros(x_len)
-        # self.act_i = nr.randr(data_len) # don't actually need these fam
-        self.w_x_i = nr.randr(x_len)
-        self.w_h_i = nr.randr(x_len)
-        self.w_c_i = nr.randr(x_len)
-        self.w_i = np.zeros(x_len)
+        self.gate_i = np.zeros((x_len, 1))
+        self.w_x_i = w_scale * np.diag(nr.randn(x_len))
+        self.w_h_i = w_scale * np.diag(nr.randn(x_len))
+        self.w_c_i = w_scale * np.diag(nr.randn(x_len))
+        self.w_i = w_scale * nr.randn(x_len, 1)
 
         # defines the forget gate, the argument of its activation function, and the biases and weights used to calculate it
-        self.gate_f = np.zeros(x_len)
-        # self.act_f = nr.randr(x_len)
-        self.w_x_f = nr.randr(x_len)
-        self.w_h_f = nr.randr(x_len)
-        self.w_c_f = nr.randr(x_len)
-        self.w_f = np.ones(x_len) # supposedly works better with ones
+        self.gate_f = np.zeros((x_len, 1))
+        self.w_x_f = w_scale * np.diag(nr.randn(x_len))
+        self.w_h_f = w_scale * np.diag(nr.randn(x_len))
+        self.w_c_f = w_scale * np.diag(nr.randn(x_len))
+        self.w_f = np.ones((x_len, 1)) # supposedly works better with ones
 
         # defines the cell state, the argument of its activation function, and the biases and weights used to calculate it
-        self.cell = np.zeros(x_len)
-        self.c_tan = nr.randr(x_len) # DO need this though
-        self.w_x_c = nr.randr(x_len)
-        self.w_h_c = nr.randr(x_len)
-        self.w_c = np.zeros(x_len)
+        self.cell = np.zeros((x_len, 1))
+        self.c_tan = np.zeros((x_len, 1))
+        self.w_x_c = w_scale * np.diag(nr.randn(x_len))
+        self.w_h_c = w_scale * np.diag(nr.randn(x_len))
+        self.w_c = w_scale * nr.randn(x_len, 1)
 
         # defines the output gate, the argument of its activation function, and the biases and weights used to calculate it
-        self.gate_o = np.zeros(x_len)
-        # self.act_o = nr.randr(x_len)
-        self.w_x_o = nr.randr(x_len)
-        self.w_h_o = nr.randr(x_len)
-        self.w_c_o = nr.randr(x_len)
-        self.w_o = np.zeros(x_len)
+        self.gate_o = np.zeros((x_len, 1))
+        self.w_x_o = w_scale * np.diag(nr.randn(x_len))
+        self.w_h_o = w_scale * np.diag(nr.randn(x_len))
+        self.w_c_o = w_scale * np.diag(nr.randn(x_len))
+        self.w_o = w_scale * nr.randn(x_len, 1)
 
         # the hidden output of the lstm
-        self.hidden = np.zeros(x_len)
-        self.p = np.zeros(x_len)
+        self.hidden = np.zeros((x_len, 1))
+        self.p = np.zeros((x_len, 1))
 
 
+    # OK
     # feedforward data through the network
     def ff(self, x):
         data = oh.hcol(x, self.x_len)
+        self.x = data
 
-        i_arg = self.w_x_i * data + self.w_h_i * self.hidden + self.w_c_i * self.cell
-        i_arg += self.w_i
+        i_arg = np.dot(self.w_x_i, data) + np.dot(self.w_h_i, self.hidden)
+        i_arg += np.dot(self.w_c_i, self.cell) + self.w_i
         self.gate_i = sig(i_arg)
 
-        f_arg = self.w_x_f * data + self.w_h_f * self.hidden + self.w_c_f * self.cell
-        f_arg += self.w_f
+        f_arg = np.dot(self.w_x_f, data) + np.dot(self.w_h_f, self.hidden)
+        f_arg += np.dot(self.w_c_f, self.cell) + self.w_f
         self.gate_f = sig(f_arg)
 
-        c_arg = self.w_x_c * data + self.w_h_c * self.hidden + self.w_c
-        self.c_tan = np.tanh(c_arg)
+        c_arg = np.dot(self.w_x_c, data) + np.dot(self.w_h_c, self.hidden)
+        self.c_tan = np.tanh(c_arg + self.w_c)
 
         self.cell = self.gate_f * self.cell + self.gate_i * self.c_tan
 
-        o_arg = self.w_x_o * data + self.w_h_o * self.hidden + self.w_c_o * self.cell
-        o_arg += self.w_o
+        o_arg = np.dot(self.w_x_o, data) + np.dot(self.w_h_o, self.hidden)
+        o_arg += np.dot(self.w_c_o, self.cell) + self.w_o
         self.gate_o = sig(o_arg)
 
         self.hidden = self.gate_o * np.tanh(self.cell)
@@ -123,19 +122,14 @@ class LSTM:
 
         x_seq, i_seq, f_seq, ct_seq = {}, {}, {}, {}
         c_seq, o_seq, h_seq, p_seq = {}, {}, {}, {}
-        i_seq[-1] = np.copy(self.gate_i)
-        f_seq[-1] = np.copy(self.gate_f)
-        ct_seq[-1] = np.copy(self.c_tan)
         c_seq[-1] = np.copy(self.cell)
-        o_seq[-1] = np.copy(self.gate_o)
         h_seq[-1] = np.copy(self.hidden)
-        p_seq[-1] = np.copy(self.p)
 
         loss = 0
 
         for t in xrange(seq_len):
-            x_seq[t] = oh.hcol(dataseq[t], self.x_len)
-            self.ff(x_seq[t])
+            self.ff(dataseq[t])
+            x_seq[t] = self.x
             i_seq[t] = self.gate_i
             f_seq[t] = self.gate_f
             ct_seq[t] = self.c_tan
@@ -143,36 +137,36 @@ class LSTM:
             o_seq[t] = self.gate_o
             h_seq[t] = self.hidden
             p_seq[t] = self.p
-            loss -= np.log(self.p[target[t]])
+            loss -= np.log(self.p[targets[t]])
 
         # gradients for the input gate
-        self.g_x_i = np.zeros(self.x_len)
-        self.g_h_i = np.zeros(self.x_len)
-        self.g_c_i = np.zeros(self.x_len)
-        self.g_i = np.zeros(self.x_len)
+        self.g_x_i = np.zeros_like(self.w_x_i)
+        self.g_h_i = np.zeros_like(self.w_h_i)
+        self.g_c_i = np.zeros_like(self.w_c_i)
+        self.g_i = np.zeros_like(self.w_i)
 
         # gradients for the forget gate
-        self.g_x_f = np.zeros(self.x_len)
-        self.g_h_f = np.zeros(self.x_len)
-        self.g_c_f = np.zeros(self.x_len)
-        self.g_f = np.zeros(self.x_len)
+        self.g_x_f = np.zeros_like(self.w_x_f)
+        self.g_h_f = np.zeros_like(self.w_h_f)
+        self.g_c_f = np.zeros_like(self.w_c_f)
+        self.g_f = np.zeros_like(self.w_f)
 
         # gradients for the cell state, and a fast link to the cell state
-        self.g_x_c = np.zeros(self.x_len)
-        self.g_h_c = np.zeros(self.x_len)
-        self.g_c = np.zeros(self.x_len)
+        self.g_x_c = np.zeros_like(self.w_x_c)
+        self.g_h_c = np.zeros_like(self.w_h_c)
+        self.g_c = np.zeros_like(self.w_c)
 
         # gradients for the output gate
-        self.g_x_o = np.zeros(self.x_len)
-        self.g_h_o = np.zeros(self.x_len)
-        self.g_c_o = np.zeros(self.x_len)
-        self.g_o = np.zeros(self.x_len)
+        self.g_x_o = np.zeros_like(self.w_x_o)
+        self.g_h_o = np.zeros_like(self.w_h_o)
+        self.g_c_o = np.zeros_like(self.w_c_o)
+        self.g_o = np.zeros_like(self.w_o)
 
         # these are the terms used to get the partial derivatives from the t=1
         # elem as well
-        c_epsilon = np.zeros(self.x_len)
-        f_epsilon = np.zeros(self.x_len)
-        h_epsilon = np.zeros(self.x_len)
+        c_epsilon = np.zeros((self.x_len, 1))
+        f_epsilon = np.zeros((self.x_len, 1))
+        h_epsilon = np.zeros((self.x_len, 1))
         for t in reversed(xrange(seq_len)):
             h_delta = p_seq[t] 
             h_delta[targets[t]] -= 1
@@ -180,47 +174,46 @@ class LSTM:
 
             o_delta = h_delta * np.tanh(c_seq[t])
             o_delta = o_seq[t] * ( 1 - o_seq[t]) * o_delta
-            for i in xrange(self.x_len): # faster this way
-                self.g_x_o[i] += o_delta[i] * x_seq[t][i]
-                self.g_h_o[i] += o_delta[i] * h_seq[t-1][i]
-                self.g_c_o[i] += o_delta[i] * c_seq[t][i]
-                self.g_o[i] += o_delta[i]
+            self.g_x_o += np.dot(o_delta, x_seq[t].T)
+            self.g_h_o += np.dot(o_delta, h_seq[t-1].T)
+            self.g_c_o += np.dot(o_delta, c_seq[t].T)
+            self.g_o += o_delta
 
-            c_delta = h_delta * o_seq[t] * (1 - np.square(c_seq[t]))
-            c_delta += o_delta * self.w_c_o + c_epsilon
+            c_delta = np.dot(self.w_c_o.T, o_delta) + c_epsilon
+            c_delta += h_delta * np.dot(self.w_c_o.T, o_seq[t])
             ct_delta = c_delta * i_seq[t] * (1 - np.square(ct_seq[t])) 
-            for i in xrange(self.x_len):
-                self.g_x_c[i] += ct_delta[i] * x_seq[t][i]
-                self.g_h_c[i] += ct_delta[i] * h_seq[t-1][i]
-                self.g_c[i] += ct_delta[i]
+            self.g_x_c += np.dot(ct_delta, x_seq[t].T)
+            self.g_h_c += np.dot(ct_delta, h_seq[t-1].T)
+            self.g_c += ct_delta
 
-            f_delta = c_delta + f_epsilon
-            f_delta = f_seq[t] * ( 1 - f_seq[t]) * f_delta
-            for i in xrange(self.x_len):
-                self.g_x_f[i] += f_delta[i] * x_seq[t][i]
-                self.g_h_f[i] += f_delta[i] * h_seq[t-1][i]
-                self.g_c_f[i] += f_delta[i] * h_seq[t-1][i]
-                self.g_f[i] += f_delta[i]
+            f_delta = c_delta * f_seq[t] * ( 1 - f_seq[t])
+            self.g_x_f += np.dot(f_delta, x_seq[t].T)
+            self.g_h_f += np.dot(f_delta, h_seq[t-1].T)
+            self.g_c_f += np.dot(f_delta, c_seq[t-1].T)
+            self.g_f += f_delta
 
             i_delta = c_delta * ct_seq[t]
             i_delta = i_seq[t] * (1 - i_seq[t]) * i_delta
-            for i in xrange(self.x_len):
-                self.g_x_i[i] += i_delta[i] * x_seq[t][i]
-                self.g_h_i[i] += i_delta[i] * h_seq[t-1][i]
-                self.g_c_i[i] += i_delta[i] * c_seq[t-1][i]
-                self.g_i[i] += i_delta[i]
+            self.g_x_i += np.dot(i_delta, x_seq[t].T)
+            self.g_h_i += np.dot(i_delta, h_seq[t-1].T)
+            self.g_c_i += np.dot(i_delta, c_seq[t-1].T)
+            self.g_i += i_delta
 
-            for i in xrange(self.x_len):
-                c_epsilon[i] = c_delta[i] * f_seq[t][i] 
-                c_epsilon[i] += f_delta[i] * self.w_c_f[i]
-                f_epsilon[i] = f_delta[i] * self.w_h_f[i]
-                h_epsilon[i] = o_delta[i] * self.w_h_o[i] 
-                h_epsilon[i] += ct_delta[i] * self.w_h_c[i]
-                h_epsilon[i] += i_delta[i] * self.w_h_i[i]
+            c_epsilon = c_delta * f_seq[t] 
+            c_epsilon += np.dot(self.w_c_f.T, f_delta) 
+            h_epsilon = np.dot(self.w_h_o.T, o_delta)
+            h_epsilon += np.dot(self.w_h_c.T, ct_delta)
+            h_epsilon += np.dot(self.w_h_i.T, i_delta)
 
-        return loss
+        grad = [
+        self.g_x_i, self.g_h_i, self.g_c_i, self.g_i,
+        self.g_x_f, self.g_h_f, self.g_c_f, self.g_f, 
+        self.g_x_c, self.g_h_c, self.g_c,
+        self.g_x_o, self.g_h_o, self.g_c_o, self.g_o
+            ]
 
-
+        for g in grad:
+            np.clip(g, -self.clip_mag, self.clip_mag, out=g)
 
         return loss
 
@@ -233,12 +226,12 @@ class LSTM:
         return ff_seq
 
     def string_sample(self, seed, length, sample_fn):
-        sample_seq = sample_fn(seed)
+        sample_seq = sample_fn(seed, length)
         return self.cc.stringify(sample_seq)
 
     def char_seed_sample(self, char, length):
         x = cc.int(char)
-        return self.sample(x, length):
+        return self.sample(x, length)
 
     def zero_seed_sample(self, length):
         x = np.zeros(self.x_len)
@@ -257,7 +250,7 @@ class LSTM:
             p = 0
             self.reset_cells()
 
-        if verbose and n %  self.freq == 0:
+        if n %  self.freq == 0:
             seed = sequence[p]
             if self.text:
                 print self.string_sample(seed, self.sample_len, self.sample)
@@ -325,31 +318,31 @@ class LSTM:
 
 
     def reset_cells(self):
-        self.gate_i = np.zeros(self.x_len)
-        self.gate_f = np.zeros(self.x_len)
-        self.c_tan = np.zeros(self.x_len)
-        self.cell = np.zeros(self.x_len)
-        self.gate_o = np.zeros(self.x_len)
-        self.hidden = np.zeros(self.x_len)
-        self.p = np.zeros(self.x_len)
+        self.gate_i = np.zeros((self.x_len, 1))
+        self.gate_f = np.zeros((self.x_len, 1))
+        self.c_tan = np.zeros((self.x_len, 1))
+        self.cell = np.zeros((self.x_len, 1))
+        self.gate_o = np.zeros((self.x_len, 1))
+        self.hidden = np.zeros((self.x_len, 1))
+        self.p = np.zeros((self.x_len, 1))
 
 
     def reset_mem(self):
-        self.m_x_i = np.zeros(self.x_len)
-        self.m_h_i = np.zeros(self.x_len)
-        self.m_c_i = np.zeros(self.x_len)
-        self.m_i = np.zeros(self.x_len)
-        self.m_x_f = np.zeros(self.x_len)
-        self.m_h_f = np.zeros(self.x_len)
-        self.m_c_f = np.zeros(self.x_len)
-        self.m_f = np.zeros(self.x_len)
-        self.m_x_c = np.zeros(self.x_len)
-        self.m_h_c = np.zeros(self.x_len)
-        self.m_c = np.zeros(self.x_len)
-        self.m_x_o = np.zeros(self.x_len)
-        self.m_h_o = np.zeros(self.x_len)
-        self.m_c_o = np.zeros(self.x_len)
-        self.m_o = np.zeros(self.x_len)
+        self.m_x_i = np.zeros((self.x_len, self.x_len))
+        self.m_h_i = np.zeros((self.x_len, self.x_len))
+        self.m_c_i = np.zeros((self.x_len, self.x_len))
+        self.m_i = np.zeros((self.x_len, 1))
+        self.m_x_f = np.zeros((self.x_len, self.x_len))
+        self.m_h_f = np.zeros((self.x_len, self.x_len))
+        self.m_c_f = np.zeros((self.x_len, self.x_len))
+        self.m_f = np.zeros((self.x_len, 1))
+        self.m_x_c = np.zeros((self.x_len, self.x_len))
+        self.m_h_c = np.zeros((self.x_len, self.x_len))
+        self.m_c = np.zeros((self.x_len, 1))
+        self.m_x_o = np.zeros((self.x_len, self.x_len))
+        self.m_h_o = np.zeros((self.x_len, self.x_len))
+        self.m_c_o = np.zeros((self.x_len, self.x_len))
+        self.m_o = np.zeros((self.x_len, 1))
 
 
     def set_freq(self, freq):
