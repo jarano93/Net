@@ -10,9 +10,11 @@ class CharCodec():
         self.charkeys = dict(zip(self.chars, range(self.num_chars)))
         self.intkeys = dict(zip(range(self.num_chars), self.chars))
 
+    # converts a number to a character
     def char(self, num):
         return self.intkeys[num]
 
+    # converts a character to a number
     def num(self, char):
         return self.charkeys[char]
 
