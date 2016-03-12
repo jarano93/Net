@@ -12,7 +12,10 @@ class CharCodec():
 
     # converts a number to a character
     def char(self, num):
-        return self.intkeys[num]
+        try:
+            return self.intkeys[num]
+        except KeyError:
+            return 'err'
 
     # converts a character to a number
     def num(self, char):

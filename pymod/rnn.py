@@ -26,15 +26,15 @@ class RNN:
         self.text = False
 
         self.h= {}
-        self.h[0] = Perceptron(x_len, h_lens[0], w_scale, False)
+        self.h[0] = Perceptron(x_len, x_len, h_lens[0], w_scale, False)
         for i in xrange(1, self.h_num):
             if peek:
-                self.h[i] = Perceptron(h_lens[i-1], h_lens[i], w_scale, True)
+                self.h[i] = Perceptron(x_len, h_lens[i-1], h_lens[i], w_scale, True)
             else:
-                self.h[i] = Perceptron(h_lens[i-1], h_lens[i], w_scale, False)
+                self.h[i] = Perceptron(x_len, h_lens[i-1], h_lens[i], w_scale, False)
 
-        self.wi = w_scale * nr.randn(h_lens[-1], x_len)
-        self.wb = w_scale * nr.randr(x_len, 1)
+        self.wi = w_scale * nr.randn(x_len, h_lens[-1])
+        self.wb = w_scale * nr.randn(x_len, 1)
         self.y = np.zeros((x_len, 1))
         self.p = np.zeros((x_len, 1))
 
@@ -43,11 +43,11 @@ class RNN:
 
 
     def ff(self, data): # OK
-        res = self.h[0].ff(x)
         self.x = oh.hcol(data, self.x_len)
+        res = self.h[0].ff(self.x)
         for i in xrange(1, self.h_num):
             if self.peek:
-                res = self.h[i].ff(res, x)
+                res = self.h[i].ff(res, self.x)
             else:
                 res = self.h[i].ff(res)
         self.y = np.dot(self.wi, res) + self.wb
@@ -81,13 +81,15 @@ class RNN:
             delta[targets[t]] -= 1
             self.gi += np.dot(delta, h_seq[self.h_num-1][t].T)
             self.gb += delta
-            for i in reversed(xrange(1, self.h_num))
+            delta = np.dot(self.wi.T, delta)
+            for i in reversed(xrange(1, self.h_num)):
+                # print str(i) + ': ' + str(h_seq[i][t].shape)
                 if self.h[i].peek:
                     delta, epsilon[i] = self.h[i].bp(delta, epsilon[i], h_seq[i-1][t], h_seq[i][t], h_seq[i][t-1], x_seq[t])
                 else:
                     delta, epsilon[i] = self.h[i].bp(delta, epsilon[i], h_seq[i-1][t], h_seq[i][t], h_seq[i][t-1])
-            _, epsilon[0] = self.h[0].bp(delta, epsilon[0], x_seq[t], h_seq[0][t], h_seq[0][t-1]])
-        self.cip_grads()
+            delta, epsilon[0] = self.h[0].bp(delta, epsilon[0], x_seq[t], h_seq[0][t], h_seq[0][t-1])
+        self.clip_grads()
         return loss
 
 
@@ -99,7 +101,7 @@ class RNN:
 
     def sample(self, seed, sample_len):
         x = np.copy(seed)
-        ff_seq = np.zeros(sample_len):
+        ff_seq = np.zeros(sample_len)
         for t in xrange(sample_len):
             x = self.ff(x)
             ff_seq[t] = x
@@ -130,13 +132,13 @@ class RNN:
         seq_len = len(sequence)
         smoothloss = -np.log(1.0 / self.x_len) * seq_len
         self.reset()
-        self.reset_mem()
-        return 0, 0, smoothloss, prep_sequence, seq_len
+        self.mem_reset()
+        return 0, 0, prep_sequence, smoothloss, seq_len
 
-    def subtrain(self, sequence, n, p, smoothloss, seq_len):
-        if p + self.rollback_len + 1 >= seq_len:
+    def subtrain(self, n, p, sequence, smoothloss, seq_len):
+        if p + self.rollback + 1 >= seq_len:
             p = 0
-            self.reset_cells()
+            self.reset()
         if n %  self.freq == 0:
             states = self.get_states()
             seed = sequence[p]
@@ -147,13 +149,13 @@ class RNN:
                 print "\n\nseed: %d, N: %d, smoothloss: %f\n\n" % (seed, n, smoothloss)
             print "- - - - - - - - - - - - - - -\n\n"
             self.set_states(states)
-        data_sub = sequence[p : p + self.rollback_len]
-        target_sub = sequence[p + 1 : p + self.rollback_len + 1]
+        data_sub = sequence[p : p + self.rollback]
+        target_sub = sequence[p + 1 : p + self.rollback + 1]
         loss = self.bptt(data_sub, target_sub)
         localsmooth = 0.999 * smoothloss + 0.001 * loss
         self.adagrad()
 
-        return n + 1, p + 1, localsmooth
+        return n + 1, p + self.rollback, localsmooth
 
     def end_train(self, n, smoothloss):
         print self.sample(-1, self.sample_len)
@@ -161,22 +163,22 @@ class RNN:
         print "- - - TRAINING COMPLETE - - -"
 
     def train_N(self, sequence, N):
-        _, p, smoothloss, prep_seq, s_len = self.prep_train(sequence)
+        _, p, prep_seq, smoothloss, s_len = self.prep_train(sequence)
         for n in xrange(N):
-            _, p, smoothloss = self.subtrain(n, p, smoothloss, sequence, s_len)
+            _, p, smoothloss = self.subtrain(n, p, prep_seq, smoothloss, s_len)
         self.end_train(n, smoothloss)
 
 
     def train_TOL(self, sequence, TOL):
-        n, p, smoothloss, prep_seq, s_len = self.prep_train(sequence)
+        n, p, prep_seq, smoothloss, s_len = self.prep_train(sequence)
         while smoothloss > TOL:
-            n, p, smoothloss = self.subtrain(n, p, smoothloss, sequence, s_len)
+            n, p, smoothloss = self.subtrain(n, p, prep_seq, smoothloss, s_len)
         self.end_train(n, smoothloss)
 
     def adagrad(self):
         for w, g, m in zip(
                 [self.wi, self.wb], [self.gi, self.gb], [self.mi, self.mb]
-            )
+            ):
             m += np.square(g)
             w -= self.step_size * g / np.sqrt(m + 1e-8)
         for i in xrange(self.h_num):
@@ -200,14 +202,14 @@ class RNN:
             self.h[i].reset()
 
     def grad_reset(self):
-        self.wi = np.zeros_like(self.wi)
-        self.wb = np.zeros_like(sefl.wb)
+        self.gi = np.zeros_like(self.wi)
+        self.gb = np.zeros_like(self.wb)
         for i in xrange(self.h_num):
             self.h[i].grad_reset()
 
     def mem_reset(self):
         self.mi = np.zeros_like(self.wi)
-        self.mb = np.zeros_like(sefl.wb) 
+        self.mb = np.zeros_like(self.wb) 
         for i in xrange(self.h_num):
             self.h[i].mem_reset()
 
@@ -218,8 +220,8 @@ class RNN:
 
     def set_clip(self, val):
         self.clip_mag = val
-        for h in xrange(self.h_num):
-            self.h_layer[h].set_clip(val)
+        for i in xrange(self.h_num):
+            self.h[i].set_clip(val)
 
 
     def set_rollback(self, val):

@@ -7,10 +7,12 @@ def load_rec(fName):
 
 def char_in(c, len, rec):
     if c not in rec.cc.chars:
-        return rec.sample(np.zeros((rec.in_len, 1)), len)
-    return rec.seed_sample(rec.cc.num(c), len)
+        return rec.char_sample(np.zeros((rec.in_len, 1)), len, rec.sample)
+    return rec.char_sample(rec.cc.num(c), len, rec.seed_sample)
 
 def val_in(val, len, rec):
+    if rec.text:
+        return rec.char_sample(val, len, rec.seed_sample)
     return rec.seed_sample(val, len)
 
 def save_output(fName, string):
