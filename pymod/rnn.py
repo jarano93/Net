@@ -1,375 +1,237 @@
 #!usr/bin/py
 
 import numpy as np
-import math as m
+import numpy.random as nr
 import onehot as oh
-import help as h
+from perceptron import Perceptron
 
-#TODO ROLLBACK
-#   tbh, I'll prolly write a new class that FINALLY incorporates rollback
 
 class RNN:
 
-    def __init__(self, data_len, hid0_len, hid1_len): # OK
-        self.data_len = data_len
-        self.hid0_len = hid0_len
-        self.hid1_len = hid1_len
+    def __init__(self, x_len, h_lens, w_scale, peek=True):
+        self.x_len = x_len
+        self.h_num = len(h_lens)
+        self.peek = peek
 
-        self.w_h0_data = 0.1 * h.rand_ND((hid0_len, data_len))
-        self.w_h0_self = 0.1 * h.rand_ND((hid0_len, hid0_len))
-        self.w_h0_prob = 0.1 * h.rand_ND((hid0_len, data_len))
-        self.w_h0_bias = 0.5 * h.rand_ND(hid0_len)
+        # set up perceptron layers
 
-        self.w_h1_hid0 = 0.1 * h.rand_ND((hid1_len, hid0_len))
-        self.w_h1_data = 0.1 * h.rand_ND((hid1_len, data_len))
-        self.w_h1_self = 0.1 * h.rand_ND((hid1_len, hid1_len))
-        self.w_h1_prob = 0.1 * h.rand_ND((hid1_len, data_len))
-        self.w_h1_bias = 0.5 * h.rand_ND(hid1_len)
+        # hyperparams
+        self.clip_mag = 5
+        self.rollback = 100
+        self.freq = 100
+        self.step_size = 1e-1
 
-        self.w_y_hid1 = 0.1 * h.rand_ND((data_len, hid1_len))
-        self.w_y_data = 0.1 * h.rand_ND((data_len, data_len))
-        self.w_y_self = 0.1 * h.rand_ND((data_len, data_len))
-        self.w_y_prob = 0.1 * h.rand_ND((data_len, data_len))
-        self.w_y_bias = 0.5 * h.rand_ND(data_len)
+        # sample params
+        self.sample_len = 1000
+        self.text = False
 
-        self.zero()
+        self.h= {}
+        self.h[0] = Perceptron(x_len, h_lens[0], w_scale, False)
+        for i in xrange(1, self.h_num):
+            if peek:
+                self.h[i] = Perceptron(h_lens[i-1], h_lens[i], w_scale, True)
+            else:
+                self.h[i] = Perceptron(h_lens[i-1], h_lens[i], w_scale, False)
+
+        self.wi = w_scale * nr.randn(h_lens[-1], x_len)
+        self.wb = w_scale * nr.randr(x_len, 1)
+        self.y = np.zeros((x_len, 1))
+        self.p = np.zeros((x_len, 1))
+
+        self.grad_reset()
+        self.mem_reset()
+
 
     def ff(self, data): # OK
-        if len(data) != self.data_len:
-            raise ValueError("Unexpected data length during ff")
+        res = self.h[0].ff(x)
+        self.x = oh.hcol(data, self.x_len)
+        for i in xrange(1, self.h_num):
+            if self.peek:
+                res = self.h[i].ff(res, x)
+            else:
+                res = self.h[i].ff(res)
+        self.y = np.dot(self.wi, res) + self.wb
+        p_common = np.exp(self.y)
+        self.p = p_common / np.sum(p_common)
+        return np.argmax(self.p)
 
-        self.act_h0 = np.zeros(self.hid0_len)
-        for i in xrange(self.hid0_len):
-            self.act_h0[i] = np.vdot(self.w_h0_data[i], data)
-            self.act_h0[i] += np.vdot(self.w_h0_self[i], self.hid0)
-            self.act_h0[i] += np.vdot(self.w_h0_prob[i], self.prob)
-            self.act_h0[i] += self.w_h0_bias[i]
-        self.hid0 = h.tanh(self.act_h0)
 
-        self.act_h1 = np.zeros(self.hid1_len)
-        for i in xrange(self.hid1_len):
-            self.act_h1[i] = np.vdot(self.w_h1_hid0[i], self.hid0)
-            self.act_h1[i] += np.vdot(self.w_h1_data[i], data)
-            self.act_h1[i] += np.vdot(self.w_h1_self[i], self.hid1)
-            self.act_h1[i] += np.vdot(self.w_h1_prob[i], self.prob)
-            self.act_h1[i] += self.w_h1_bias[i]
-        self.hid1 = h.tanh(self.act_h1)
-
-        self.act_y = np.zeros(self.data_len)
-        for i in xrange(self.data_len):
-            self.act_y[i] = np.vdot(self.w_y_hid1[i], self.hid1)
-            self.act_y[i] = np.vdot(self.w_y_data[i], data)
-            self.act_y[i] = np.vdot(self.w_y_self[i], self.y)
-            self.act_y[i] = np.vdot(self.w_y_prob[i], self.prob)
-            self.act_y[i] += self.w_y_bias[i]
-        self.y = h.tanh(self.act_y)
-
-        self.prob = h.softmax(self.y)
-        return self.prob
-
-    # this ain't right. I need to use three ff caches -- DONE(?)
-    def bptt(self, sequence):
-        # for sequence, rows are the individual datapoints in the sequence
-        if len(sequence[0]) != self.data_len:
-            raise ValueError("Unexpected data length during bptt")
-        self.zero()
-        seq_len = len(sequence)
-
-        self.g_h0_data = np.zeros((self.hid0_len, self.data_len))
-        self.g_h0_self = np.zeros((self.hid0_len, self.hid0_len))
-        self.g_h0_prob = np.zeros((self.hid0_len, self.data_len))
-        self.g_h0_bias = np.zeros(self.hid0_len)
-
-        self.g_h1_hid0 = np.zeros((self.hid1_len, self.hid0_len))
-        self.g_h1_data = np.zeros((self.hid1_len, self.data_len))
-        self.g_h1_self = np.zeros((self.hid1_len, self.hid1_len))
-        self.g_h1_prob = np.zeros((self.hid1_len, self.data_len))
-        self.g_h1_bias = np.zeros(self.hid1_len)
-
-        self.g_y_hid1 = np.zeros((self.data_len, self.hid1_len))
-        self.g_y_data = np.zeros((self.data_len, self.data_len))
-        self.g_y_self = np.zeros((self.data_len, self.data_len))
-        self.g_y_prob = np.zeros((self.data_len, self.data_len))
-        self.g_y_bias = np.zeros(self.data_len)
-
-        # sequential values initialization
-        # old doesn't need the activations
-        hid0_old = np.zeros(self.hid0_len)
-        hid1_old = np.zeros(self.hid1_len)
-        y_old = np.zeros(self.data_len)
-        prob_old = np.zeros(self.data_len)
-
-        data = np.zeros(self.data_len)
-
-        # current(cur) DOES need the activations
-        ff_res_cur = self.ff(np.zeros(self.data_len))
-        act_h0_cur = self.act_h0
-        hid0_cur = self.hid0
-
-        act_h1_cur = self.act_h1
-        hid1_cur = self.hid1
-
-        act_y_cur = self.act_y
-        y_cur = self.y
-
-        prob_cur = self.prob
-
-        # gamma vals for cur
-        y_gamma = (prob_cur - sequence[0])
-        h1_gamma = h.vt_mult(y_gamma * h.dtanh(act_y_cur), self.w_y_hid1)
-        h0_gamma = h.vt_mult(h1_gamma * h.dtanh(act_h1_cur), self.w_h1_hid0)
-
-        # epsilon vals for future
-        y_epsilon = np.zeros(self.data_len)
-        h1_epsilon = np.zeros(self.hid1_len)
-        h0_epsilon = np.zeros(self.hid0_len)
-
-        # fast delta values  PROTIP!  ALSO THE BIAS GRADIENTS FORALL
-        # sum together
-        y_delta = np.zeros(self.data_len)
-        h1_delta = np.zeros(self.hid1_len)
-        h0_delta = np.zeros(self.hid0_len)
-
-        # GET MAX LENGTHS FOR INNERMOST FOR LOOPS NOW faster this way
-        max_len_y = int(np.amax((self.data_len, self.hid1_len)))
-        max_len_h1 = int(np.amax((self.data_len, self.hid0_len, self.hid1_len)))
-        max_len_h0 = int(np.amax((self.data_len, self.hid0_len)))
-        for t in xrange(seq_len - 1):
-            # print t
-            # feedforward for the t+1 data
-            self.ff(sequence[t])
-            # seq_cur = sequence[t]
-            seq = sequence[t+1]
-
-            # bptt here
-            y_epsilon = (self.prob - seq)
-            y_delta = y_epsilon * h.vt_mult(h.dtanh(self.act_y), self.w_y_self)
-            y_delta = (y_gamma + y_delta) * h.dtanh(act_y_cur)
-            for i in xrange(self.data_len):
-                for j in xrange(max_len_y):
-                    if j < self.hid1_len:
-                        self.g_y_hid1[i,j] += y_delta[i] * self.hid1[j]
-                    if j < self.data_len:
-                        self.g_y_data[i,j] += y_delta[i] * data[j]
-                        self.g_y_self[i,j] += y_delta[i] * y_old[j]
-                        self.g_y_prob[i,j] += y_delta[i] * prob_old[j]
-                self.g_y_bias[i] += y_delta[i]
-
-            h1_epsilon = h.vt_mult(y_epsilon * h.dtanh(self.act_y), self.w_y_hid1)
-            h1_delta = h1_epsilon * h.vt_mult(h.dtanh(self.act_h1), self.w_h1_self)
-            h1_delta = (h1_gamma + h1_delta) * h.dtanh(act_h1_cur)
-            for i in xrange(self.hid1_len):
-                for j in xrange(max_len_h1):
-                    if j < self.hid0_len:
-                        self.g_h1_hid0[i] += h1_delta[i] * self.hid0[j]
-                    if j < self.data_len:
-                        self.g_h1_data[i] += h1_delta[i] * data[j]
-                        self.g_h1_prob[i] += h1_delta[i] * prob_old[j]
-                    if j < self.hid1_len:
-                        self.g_h1_self[i] += h1_delta[i] * hid1_old[j]
-                self.g_h1_bias[i] += h1_delta[i]
-
-            h0_epsilon = h.vt_mult(h1_epsilon * h.dtanh(self.act_h1), self.w_h1_hid0)
-            h0_delta = h0_epsilon * h.vt_mult(h.dtanh(self.act_h0), self.w_h0_self)
-            h0_delta = (h0_gamma + h0_delta) * h.dtanh(act_h0_cur)
-            for i in xrange(self.hid0_len):
-                for j in xrange(max_len_h0):
-                    if j < self.data_len:
-                        self.g_h0_data[i] += h0_delta[i] * data[j]
-                        self.g_h0_prob[i] += h0_delta[i] * prob_old[j]
-                    if j < self.hid0_len:
-                        self.g_h0_self[i] += h0_delta[i] * hid0_old[j]
-                self.g_h0_bias[i] += h0_delta[i]
-
-            # prep for next iteration
-            y_gamma = y_epsilon
-            h1_gamma = h1_epsilon
-            h0_gamma = h0_epsilon
-
-            hid0_old = hid0_cur
-            hid1_old = hid1_cur
-            y_old = y_cur
-            prob_old = prob_cur
-
-            act_h0_cur = self.act_h0
-            hid0_cur = self.hid0
-
-            act_h1_cur = self.act_h1
-            hid1_cur = self.hid1
-
-            act_y_cur = self.act_y
-            y_cur = self.y
-
-            prob_cur = self.prob
-
-            data = seq
-            # ENDFOR
-
-        # and then bp for T'th stuff alone
-        # don't need to ff again
-        y_delta = y_gamma * h.dtanh(self.act_y)
-        for i in xrange(self.data_len):
-            for j in xrange(max_len_y):
-                if j < self.hid1_len:
-                    self.g_y_hid1[i,j] += y_delta[i] * self.hid1[j]
-                if j < self.data_len:
-                    self.g_y_data[i,j] += y_delta[i] * data[j]
-                    self.g_y_self[i,j] += y_delta[i] * y_old[j]
-                    self.g_y_prob[i,j] += y_delta[i] * prob_old[j]
-            self.g_y_bias[i] += y_delta[i]
-
-        h1_delta = h1_gamma * h.dtanh(self.act_h1)
-        for i in xrange(self.hid1_len):
-            for j in xrange(max_len_h1):
-                if j < self.hid0_len:
-                    self.g_h1_hid0[i] += h1_delta[i] * self.hid0[j]
-                if j < self.data_len:
-                    self.g_h1_data[i] += h1_delta[i] * data[j]
-                    self.g_h1_prob[i] += h1_delta[i] * prob_old[j]
-                if j < self.hid1_len:
-                    self.g_h1_self[i] += h1_delta[i] * hid1_old[j]
-            self.g_h1_bias[i] += h1_delta[i]
-
-        h0_delta = h0_gamma * h.dtanh(self.act_h0)
-        for i in xrange(self.hid0_len):
-            for j in xrange(max_len_h0):
-                if j < self.data_len:
-                    self.g_h0_data[i] += h0_delta[i] * data[j]
-                    self.g_h0_prob[i] += h0_delta[i] * prob_old[j]
-                if j < self.hid0_len:
-                    self.g_h0_self[i] += h0_delta[i] * hid0_old[j]
-            self.g_h0_bias[i] += h0_delta[i]
-
-    def sample(self, sample_len): # OK
-        self.zero()
-        gen_sample = np.zeros((sample_len, self.data_len))
-        seed = np.zeros(self.data_len)
-        for t in xrange(sample_len):
-            gen_sample[t,:] = oh.hot(np.argmax(self.ff(seed)), self.data_len)
-            seed = gen_sample[t,:]
-        return gen_sample
-
-    def seq_loss(self, sequence, verbose=True):
-        if len(sequence[0]) != self.data_len:
-            raise("Unexpected data length during seq_loss")
-        self.zero()
-        seed = np.zeros(self.data_len)
+    def bptt(self, dataseq, targets):
+        seq_len = len(dataseq)
+        x_seq, h_seq, y_seq, p_seq = {}, {}, {}, {}
+        for i in xrange(self.h_num):
+            temp = {}
+            temp[-1] = self.h[i].h
+            h_seq[i] = temp
         loss = 0
-        for t in xrange(len(sequence)):
-            actual_data = sequence[t,:]
-            key = int(np.argmax(actual_data))
-            output = self.ff(seed)
-            loss -= m.log(output[key])
-            seed = sequence[t,:]
-        if verbose:
-            print "current sequence loss: %f" % (loss)
-        self.zero()
+        for t in xrange(seq_len):
+            self.ff(dataseq[t])
+            x_seq[t] = self.x
+            y_seq[t] = self.y
+            p_seq[t] = self.p
+            for i in xrange(self.h_num):
+                h_seq[i][t] = self.h[i].h
+            loss -= np.log(self.p[targets[t]])
+        # zero grads in init and after each adagrad
+        epsilon = {}
+        for i in xrange(self.h_num):
+            epsilon[i] = np.zeros_like(self.h[i].wb)
+        for t in reversed(xrange(seq_len)):
+            delta = p_seq[t]
+            delta[targets[t]] -= 1
+            self.gi += np.dot(delta, h_seq[self.h_num-1][t].T)
+            self.gb += delta
+            for i in reversed(xrange(1, self.h_num))
+                if self.h[i].peek:
+                    delta, epsilon[i] = self.h[i].bp(delta, epsilon[i], h_seq[i-1][t], h_seq[i][t], h_seq[i][t-1], x_seq[t])
+                else:
+                    delta, epsilon[i] = self.h[i].bp(delta, epsilon[i], h_seq[i-1][t], h_seq[i][t], h_seq[i][t-1])
+            _, epsilon[0] = self.h[0].bp(delta, epsilon[0], x_seq[t], h_seq[0][t], h_seq[0][t-1]])
+        self.cip_grads()
         return loss
 
-    def train_N(self, sequence, step_size, momentum, N, verbose=True): # OK
-        self.momentum_zero()
-        for i in xrange(N):
-            self.bptt(sequence)
-            self.grad_desc(step_size)
-            if verbose:
-                loss = self.seq_loss(sequence)
 
-    def train_LOSS(self, sequence, step_size, momentum, LOSS, verbose=True): # OK
-        self.momentum_zero()
-        loss = self.seq_loss(sequence, verbose)
-        while loss > LOSS:
-            self.bptt(sequence)
-            self.momentum_desc(step_size, momentum)
-            loss = self.seq_loss(sequence, False)
-            if verbose:
-                print "current sequence loss: %f" % (loss)
+    def clip_grads(self):
+        for g in [self.gi, self.gb]:
+            np.clip(g, -self.clip_mag, self.clip_mag, out=g)
+        for i in xrange(self.h_num):
+            self.h[i].clip_grads()
 
-    # momentum must be [0,1)
-    def momentum_desc(self, step_size, momentum): # OK
-        # IDK if this is as efficient tbh fam
-        self.grad_desc(step_size)
+    def sample(self, seed, sample_len):
+        x = np.copy(seed)
+        ff_seq = np.zeros(sample_len):
+        for t in xrange(sample_len):
+            x = self.ff(x)
+            ff_seq[t] = x
+        if self.text:
+            return self.cc.stringify(ff_seq)
+        else:
+            return ff_seq
 
-        self.w_h0_data -= momentum * self.m_h0_data
-        self.w_h0_self -= momentum * self.m_h0_self
-        self.w_h0_prob -= momentum * self.m_h0_prob
-        self.w_h0_bias -= momentum * self.m_h0_bias
+    def clean_sample(self, sample_len):
+        self.reset()
+        return self.sample(-1, sample_len)
 
-        self.w_h1_hid0 -= momentum * self.m_h1_hid0
-        self.w_h1_data -= momentum * self.m_h1_data
-        self.w_h1_self -= momentum * self.m_h1_self
-        self.w_h1_prob -= momentum * self.m_h1_prob
-        self.w_h1_bias -= momentum * self.m_h1_bias
+    def ui_sample(self, sample_len):
+        ui_seed = raw_input('Enter a single character or an valid int:\n>>')
+        seed = -1
+        if self.text:
+            c_seed = ui_seed[0]
+            if c_seed in self.cc.chars:
+                seed = self.cc.num(c_seed[0])
+        else:
+            v_seed = int(ui_seed)
+            if -1 < v_seed and v_seed < self.x_len:
+                seed = int(char_seed)
+        return self.sample(seed, sample_len)
 
-        self.w_y_hid1 -= momentum * self.m_y_hid1
-        self.w_y_data -= momentum * self.m_y_data
-        self.w_y_self -= momentum * self.m_y_self
-        self.w_y_prob -= momentum * self.m_y_prob
-        self.w_y_bias -= momentum * self.m_y_bias
+    def prep_train(self, sequence):
+        prep_sequence = np.insert(sequence, 0, -1)
+        seq_len = len(sequence)
+        smoothloss = -np.log(1.0 / self.x_len) * seq_len
+        self.reset()
+        self.reset_mem()
+        return 0, 0, smoothloss, prep_sequence, seq_len
 
-        self.cache_momentum(step_size)
+    def subtrain(self, sequence, n, p, smoothloss, seq_len):
+        if p + self.rollback_len + 1 >= seq_len:
+            p = 0
+            self.reset_cells()
+        if n %  self.freq == 0:
+            states = self.get_states()
+            seed = sequence[p]
+            print self.sample(seed, self.sample_len)
+            if self.text:
+                print "\n\nseed: %s, N: %d, smoothloss: %f\n\n" % (self.cc.char(seed), n, smoothloss)
+            else:
+                print "\n\nseed: %d, N: %d, smoothloss: %f\n\n" % (seed, n, smoothloss)
+            print "- - - - - - - - - - - - - - -\n\n"
+            self.set_states(states)
+        data_sub = sequence[p : p + self.rollback_len]
+        target_sub = sequence[p + 1 : p + self.rollback_len + 1]
+        loss = self.bptt(data_sub, target_sub)
+        localsmooth = 0.999 * smoothloss + 0.001 * loss
+        self.adagrad()
 
-    def grad_desc(self, step_size):
-        self.w_h0_data -= step_size * self.g_h0_data
-        self.w_h0_self -= step_size * self.g_h0_self
-        self.w_h0_prob -= step_size * self.g_h0_prob
-        self.w_h0_bias -= step_size * self.g_h0_bias
+        return n + 1, p + 1, localsmooth
 
-        self.w_h1_hid0 -= step_size * self.g_h1_hid0
-        self.w_h1_data -= step_size * self.g_h1_data
-        self.w_h1_self -= step_size * self.g_h1_self
-        self.w_h1_prob -= step_size * self.g_h1_prob
-        self.w_h1_bias -= step_size * self.g_h1_bias
+    def end_train(self, n, smoothloss):
+        print self.sample(-1, self.sample_len)
+        print "N: %d, smoothloss: %f\n\n" % (n, smoothloss)
+        print "- - - TRAINING COMPLETE - - -"
 
-        self.w_y_hid1 -= step_size * self.g_y_hid1
-        self.w_y_data -= step_size * self.g_y_data
-        self.w_y_self -= step_size * self.g_y_self
-        self.w_y_prob -= step_size * self.g_y_prob
-        self.w_y_bias -= step_size * self.g_y_bias
+    def train_N(self, sequence, N):
+        _, p, smoothloss, prep_seq, s_len = self.prep_train(sequence)
+        for n in xrange(N):
+            _, p, smoothloss = self.subtrain(n, p, smoothloss, sequence, s_len)
+        self.end_train(n, smoothloss)
 
-    def cache_momentum(self, step_size): # OK
-        self.m_h0_data = step_size * self.g_h0_data
-        self.m_h0_self = step_size * self.g_h0_self
-        self.m_h0_prob = step_size * self.g_h0_prob
-        self.m_h0_bias = step_size * self.g_h0_bias
 
-        self.m_h1_hid0 = step_size * self.g_h1_hid0
-        self.m_h1_data = step_size * self.g_h1_data
-        self.m_h1_self = step_size * self.g_h1_self
-        self.m_h1_prob = step_size * self.g_h1_prob
-        self.m_h1_bias = step_size * self.g_h1_bias
+    def train_TOL(self, sequence, TOL):
+        n, p, smoothloss, prep_seq, s_len = self.prep_train(sequence)
+        while smoothloss > TOL:
+            n, p, smoothloss = self.subtrain(n, p, smoothloss, sequence, s_len)
+        self.end_train(n, smoothloss)
 
-        self.m_y_hid1 =  step_size * self.g_y_hid1
-        self.m_y_data =  step_size * self.g_y_data
-        self.m_y_self =  step_size * self.g_y_self
-        self.m_y_prob =  step_size * self.g_y_prob
-        self.m_y_bias =  step_size * self.g_y_bias
+    def adagrad(self):
+        for w, g, m in zip(
+                [self.wi, self.wb], [self.gi, self.gb], [self.mi, self.mb]
+            )
+            m += np.square(g)
+            w -= self.step_size * g / np.sqrt(m + 1e-8)
+        for i in xrange(self.h_num):
+            self.h[i].adagrad(self.step_size)
+        self.grad_reset()
 
-    def zero(self): # OK
-        self.act_h0 = np.zeros(self.hid0_len)
-        self.hid0 = np.zeros(self.hid0_len)
+    def get_states(self):
+        states = {}
+        for i in xrange(self.h_num):
+            states[i] = self.h[i].h
+        return states
 
-        self.act_h1 = np.zeros(self.hid1_len)
-        self.hid1 = np.zeros(self.hid1_len)
+    def set_states(self, states):
+        for i in xrange(self.h_num):
+            self.h[i].h = states[i]
 
-        self.act_y = np.zeros(self.data_len)
-        self.y = np.zeros(self.data_len)
+    def reset(self):
+        self.y = np.zeros_like(self.y)
+        self.p = np.zeros_like(self.p)
+        for i in xrange(self.h_num):
+            self.h[i].reset()
 
-        self.prob = np.zeros(self.data_len)
+    def grad_reset(self):
+        self.wi = np.zeros_like(self.wi)
+        self.wb = np.zeros_like(sefl.wb)
+        for i in xrange(self.h_num):
+            self.h[i].grad_reset()
 
-    def momentum_zero(self): # OK as long as init stays the same
-        self.m_h0_data = np.zeros((self.hid0_len, self.data_len))
-        self.m_h0_self = np.zeros((self.hid0_len, self.hid0_len))
-        self.m_h0_prob = np.zeros((self.hid0_len, self.data_len))
-        self.m_h0_bias = np.zeros(self.hid0_len)
+    def mem_reset(self):
+        self.mi = np.zeros_like(self.wi)
+        self.mb = np.zeros_like(sefl.wb) 
+        for i in xrange(self.h_num):
+            self.h[i].mem_reset()
 
-        self.m_h1_hid0 = np.zeros((self.hid1_len, self.hid0_len))
-        self.m_h1_data = np.zeros((self.hid1_len, self.data_len))
-        self.m_h1_self = np.zeros((self.hid1_len, self.hid1_len))
-        self.m_h1_prob = np.zeros((self.hid1_len, self.data_len))
-        self.m_h1_bias = np.zeros(self.hid1_len)
 
-        self.m_y_hid1 = np.zeros((self.data_len, self.hid1_len))
-        self.m_y_data = np.zeros((self.data_len, self.data_len))
-        self.m_y_self = np.zeros((self.data_len, self.data_len))
-        self.m_y_prob = np.zeros((self.data_len, self.data_len))
-        self.m_y_bias = np.zeros(self.data_len)
+    def set_freq(self, freq):
+        self.freq = freq
+
+
+    def set_clip(self, val):
+        self.clip_mag = val
+        for h in xrange(self.h_num):
+            self.h_layer[h].set_clip(val)
+
+
+    def set_rollback(self, val):
+        self.rollback= val
+
+    def set_codec(self, cc):
+        self.text = True
+        self.cc = cc
+
+    def del_codec(self):
+        self.text = False
+        del self.cc
+
+    def set_sample_len(self, length):
+        self.sample_len = length
