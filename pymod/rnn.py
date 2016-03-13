@@ -20,6 +20,7 @@ class RNN:
         self.rollback = 100
         self.freq = 100
         self.step_size = 1e-1
+        self.padd = self.rollback
 
         # sample params
         self.sample_len = 1000
@@ -99,6 +100,7 @@ class RNN:
         for i in xrange(self.h_num):
             self.h[i].clip_grads()
 
+
     def sample(self, seed, sample_len):
         x = np.copy(seed)
         ff_seq = np.zeros(sample_len)
@@ -110,12 +112,14 @@ class RNN:
         else:
             return ff_seq
 
+
     def clean_sample(self, sample_len):
         self.reset()
         return self.sample(-1, sample_len)
 
+
     def ui_sample(self, sample_len):
-        ui_seed = raw_input('Enter a single character or an valid int:\n>>')
+        ui_seed = raw_input('Enter a single character or an valid int:\n\t>')
         seed = -1
         if self.text:
             c_seed = ui_seed[0]
@@ -126,6 +130,7 @@ class RNN:
             if -1 < v_seed and v_seed < self.x_len:
                 seed = int(char_seed)
         return self.sample(seed, sample_len)
+
 
     def prep_train(self, sequence):
         prep_sequence = np.insert(sequence, 0, -1)
@@ -147,7 +152,7 @@ class RNN:
                 print "\n\nseed: %s, N: %d, smoothloss: %f\n\n" % (self.cc.char(seed), n, smoothloss)
             else:
                 print "\n\nseed: %d, N: %d, smoothloss: %f\n\n" % (seed, n, smoothloss)
-            print "- - - - - - - - - - - - - - -\n\n"
+            print "- - - - - - - - - - - - - - - - - - - - - - - - - - - -\n\n"
             self.set_states(states)
         data_sub = sequence[p : p + self.rollback]
         target_sub = sequence[p + 1 : p + self.rollback + 1]
@@ -155,16 +160,16 @@ class RNN:
         localsmooth = 0.999 * smoothloss + 0.001 * loss
         self.adagrad()
 
-        return n + 1, p + self.rollback, localsmooth
+        return n + 1, p + self.padd, localsmooth
 
     def end_train(self, n, smoothloss):
         print self.sample(-1, self.sample_len)
         print "N: %d, smoothloss: %f\n\n" % (n, smoothloss)
-        print "- - - TRAINING COMPLETE - - -"
+        print "*****\tTRAINING COMPLETE\t*****"
 
     def train_N(self, sequence, N):
         _, p, prep_seq, smoothloss, s_len = self.prep_train(sequence)
-        for n in xrange(N):
+        for n in xrange(int(N)):
             _, p, smoothloss = self.subtrain(n, p, prep_seq, smoothloss, s_len)
         self.end_train(n, smoothloss)
 
@@ -237,3 +242,6 @@ class RNN:
 
     def set_sample_len(self, length):
         self.sample_len = length
+
+    def set_padd(self, val):
+        self.padd = val
