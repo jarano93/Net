@@ -140,6 +140,15 @@ class RNN:
         self.mem_reset()
         return 0, 0, prep_sequence, smoothloss, seq_len
 
+
+    def prep_cont(self, sequence):
+        prep_sequence = np.insert(sequence, 0, -1)
+        seq_len = len(sequence)
+        smoothloss = -np.log(1.0 / self.x_len) * seq_len
+        self.reset()
+        return 0, 0, prep_sequence, smoothloss, seq_len
+        
+
     def subtrain(self, n, p, sequence, smoothloss, seq_len):
         if p + self.rollback + 1 >= seq_len:
             p = 0
@@ -171,6 +180,18 @@ class RNN:
         _, p, prep_seq, smoothloss, s_len = self.prep_train(sequence)
         for n in xrange(int(N)):
             _, p, smoothloss = self.subtrain(n, p, prep_seq, smoothloss, s_len)
+        self.end_train(n, smoothloss)
+
+    def cont_N(self, sequence, N):
+        _, p, prep_seq, smoothloss, s_len = self.prep_cont(sequence)
+        for n in xrange(int(N)):
+            _, p, smoothloss = self.subtrain(n, p, prep_seq, smoothloss, s_len)
+        self.end_train(n, smoothloss)
+
+    def cont_TOL(self, sequence, TOL):
+        n, p, prep_seq, smoothloss, s_len = self.prop_cont(sequence)
+        while smoothloss > TOL:
+            n, p, smoothloss = self.subtrain(n, p, prep_seq, smoothloss, s_len)
         self.end_train(n, smoothloss)
 
 
