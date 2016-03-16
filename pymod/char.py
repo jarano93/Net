@@ -15,7 +15,7 @@ class CharCodec():
         try:
             return self.intkeys[num]
         except KeyError:
-            return 'err'
+            return 'zeros'
 
     # converts a character to a number
     def num(self, char):
