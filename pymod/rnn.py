@@ -1,4 +1,4 @@
-#!usr/bin/py
+#!/usr/bin/python
 
 import numpy as np
 import numpy.random as nr
@@ -56,6 +56,22 @@ class RNN:
         self.p = p_common / np.sum(p_common)
         return np.argmax(self.p)
 
+    def ff_fast(self, data):
+        self.x = oh.hcol(data, self.x_len)
+        res = self.h[0].ff_fast(self.x)
+        if self.peek:
+            for i in xrange(1, self.h_num):
+                res = self.h[i].ff_fast(res, self.x)
+        else:
+            for i in xrange(1, self.h_num):
+                res = self.h[i].ff_fast(res)
+        for i in xrange(self.x_len):
+            self.y[i,0] = np.vdot(self.wi[i,:], data) + self.wb[i,0]
+        p_common = np.exp(self.y)
+        self.p = p_common/ np.sum(p_common)
+        return np.argmax(self.p)
+
+
 
     def bptt(self, dataseq, targets):
         seq_len = len(dataseq)
@@ -94,6 +110,46 @@ class RNN:
         return loss
 
 
+    def bptt_fast(self, dataseq, targets):
+        seq_len = len(dataseq)
+        x_seq, h_seq, y_seq, p_seq = {}, {}, {}, {}
+        for i in xrange(self.h_num):
+            temp = {}
+            temp[-1] = self.h[i].h
+            h_seq[i] = temp
+        loss = 0
+        for t in xrange(seq_len):
+            self.ff_fast(dataseq[t])
+            x_seq[t] = self.x
+            y_seq[t] = self.y
+            p_seq[t] = self.p
+            for i in xrange(self.h_num):
+                h_seq[i][t] = self.h[i].h
+            loss -= np.log(self.p[targets[t]])
+        # zero grads in init and after each adagrad
+        epsilon = {}
+        for i in xrange(self.h_num):
+            epsilon[i] = np.zeros_like(self.h[i].wb)
+        for t in reversed(xrange(seq_len)):
+            delta = p_seq[t]
+            delta[targets[t]] -= 1
+            for i in xrange(self.x_len):
+                for j in xrange(self.h[self.h_num-1].h_len):
+                    self.gi[i,j] += delta[i] * h_seq[self.h_num-1][t][j]
+                self.gb[i] += np.delta[i]
+            delta = np.dot(self.wi.T, delta)
+            for i in reversed(xrange(1, self.h_num)):
+                # print str(i) + ': ' + str(h_seq[i][t].shape)
+                if self.h[i].peek:
+                    delta, epsilon[i] = self.h[i].bp_fast(delta, epsilon[i], h_seq[i-1][t], h_seq[i][t], h_seq[i][t-1], x_seq[t])
+                else:
+                    delta, epsilon[i] = self.h[i].bp_fast(delta, epsilon[i], h_seq[i-1][t], h_seq[i][t], h_seq[i][t-1])
+            delta, epsilon[0] = self.h[0].bp_fast(delta, epsilon[0], x_seq[t], h_seq[0][t], h_seq[0][t-1])
+        self.clip_grads()
+        return loss
+
+
+
     def clip_grads(self):
         for g in [self.gi, self.gb]:
             np.clip(g, -self.clip_mag, self.clip_mag, out=g)
@@ -119,7 +175,7 @@ class RNN:
 
 
     def ui_sample(self, sample_len):
-        ui_seed = raw_input('Enter a single character or an valid int:\n\t>')
+        ui_seed = raw_input('Enter a single character or a valid int:\n>')
         seed = -1
         if self.text:
             c_seed = ui_seed[0]
