@@ -34,6 +34,7 @@ class Perceptron:
         self.h = np.tanh(h_arg + self.wb)
         return self.h
 
+    # broken
     def ff_fast(self, data, *p):
         h_arg = np.zeros((self.h_len, 1))
         if self.peek:
@@ -44,6 +45,8 @@ class Perceptron:
                 h_arg[i,0] += self.wb[i,0]
         else:
             for i in xrange(self.h_len):
+                print i
+                print np.vdot(self.wi[i,:], data).shape
                 h_arg[i,0] = np.vdot(self.wi[i,:], data)
                 h_arg[i,0] += np.vdot(self.wh[i,:], self.h)
                 h_arg[i,0] += self.wb[i,0]
@@ -61,13 +64,14 @@ class Perceptron:
         self.gb += delta
         return np.dot(self.wi.T, delta), np.dot(self.wh.T, delta)
 
+    # deprecated
     def bp_fast(self, top_err, self_err, data, h_cur, h_prev, *p):
         delta = ( 1 - np.square(h_cur)) * (top_err + self_err)
         if self.peek:
             loop = np.amax([self.x_len, self.in_len, self.h_len])
             p = np.array(p).reshape(self.x_len, 1)
             for i in xrange(self.h_len):
-                for j in xrange(loop)
+                for j in xrange(loop):
                     if j < self.in_len:
                         self.gi[i,j] += delta[i] * data[j]
                     if j < self.h_len:
@@ -78,7 +82,7 @@ class Perceptron:
         else:
             loop = np.amax([self.in_len, self.h_len])
             for i in xrange(self.h_len):
-                for j in xrange(loop)
+                for j in xrange(loop):
                     if j < self.in_len:
                         self.gi[i,j] += delta[i] * data[j]
                     if j < self.h_len:
@@ -90,7 +94,7 @@ class Perceptron:
         for i in xrange(loop):
             if j < self.in_len:
                 ret_top[i,0] = np.vdot(self.wi.T[i], delta)
-            if J < self.h_len:
+            if j < self.h_len:
                 ret_self[i] = np.vdot(self.wh.T[i], delta)
         return ret_top, ret_self
 
