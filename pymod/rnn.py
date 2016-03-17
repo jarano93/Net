@@ -156,6 +156,16 @@ class RNN:
         for i in xrange(self.h_num):
             self.h[i].clip_grads()
 
+    def sample_fast(self, seed, sample_len):
+        x = np.copy(seed)
+        ff_seq = np.zeros(sample_len)
+        for t in xrange(sample_len):
+            x = self.ff_fast(x)
+            ff_seq[t] = x
+        if self.text:
+            return self.cc.stringify(ff_seq)
+        else:
+            return ff_seq
 
     def sample(self, seed, sample_len):
         x = np.copy(seed)
@@ -225,6 +235,26 @@ class RNN:
         localsmooth = 0.999 * smoothloss + 0.001 * loss
         self.adagrad()
 
+    def subtrain_fast(self, n, p, sequence, smoothloss, seq_len):
+        if p + self.rollback + 1 >= seq_len:
+            p = 0
+            self.reset()
+        if n %  self.freq == 0:
+            states = self.get_states()
+            seed = sequence[p]
+            print self.sample_fast(seed, self.sample_len)
+            if self.text:
+                print "\n\nseed: %s, N: %d, smoothloss: %f\n\n" % (self.cc.char(seed), n, smoothloss)
+            else:
+                print "\n\nseed: %d, N: %d, smoothloss: %f\n\n" % (seed, n, smoothloss)
+            print "- - - - - - - - - - - - - - - - - - - - - - - - - - - -\n\n"
+            self.set_states(states)
+        data_sub = sequence[p : p + self.rollback]
+        target_sub = sequence[p + 1 : p + self.rollback + 1]
+        loss = self.bptt_fast(data_sub, target_sub)
+        localsmooth = 0.999 * smoothloss + 0.001 * loss
+        self.adagrad()
+
         return n + 1, p + self.padd, localsmooth
 
     def end_train(self, n, smoothloss):
@@ -235,7 +265,7 @@ class RNN:
     def train_N(self, sequence, N):
         _, p, prep_seq, smoothloss, s_len = self.prep_train(sequence)
         for n in xrange(int(N)):
-            _, p, smoothloss = self.subtrain(n, p, prep_seq, smoothloss, s_len)
+            _, p, smoothloss = self.subtrain_fast(n, p, prep_seq, smoothloss, s_len)
         self.end_train(n, smoothloss)
 
     def cont_N(self, sequence, N):
