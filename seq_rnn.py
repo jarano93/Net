@@ -4,7 +4,7 @@ from pymod.rnn import RNN as RNN
 from pymod.char import CharCodec as CCodec
 import pickle
 
-f = open('twc_clean.txt', 'r')
+f = open('twcshort.txt', 'r')
 str_dataset = f.read().lower()
 seq_length = len(str_dataset)
 cc = CCodec(str_dataset)

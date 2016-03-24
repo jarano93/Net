@@ -15,14 +15,14 @@ print "%d unique characters in dataset\n\n" % uni_chars
 
 # model params
 weight_scale = 1e-1
-layers = [80, 80, 80]
+layers = [50, 50, 50, 50]
 
 
 rnn = RNN(uni_chars, layers, weight_scale, False)
 rnn.set_freq(100)
 rnn.set_sample_len(400)
-rnn.set_rollback(50)
-rnn.set_padd(3)
+rnn.set_rollback(100)
+rnn.set_padd(1)
 rnn.set_clip(10)
 rnn.set_codec(cc)
 rnn.train_N(int_dataset, 2e5)
