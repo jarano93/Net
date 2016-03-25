@@ -290,11 +290,27 @@ class RNN:
             n, p, smoothloss = self.subtrain(n, p, prep_seq, smoothloss, s_len)
         self.end_train(n, smoothloss)
 
+    def cont_NTOL(self, sequence, N, TOL):
+        _, p, prep_seq, smoothloss, s_len = self.prep_cont(sequence)
+        for n in xrange(int(N)):
+            _, p, smoothloss = self.subtrain(n, p, prep_seq, smoothloss, s_len)
+            if smoothloss < TOL:
+                break
+        self.end_train(n, smoothloss)
+
 
     def train_TOL(self, sequence, TOL):
         n, p, prep_seq, smoothloss, s_len = self.prep_train(sequence)
         while smoothloss > TOL:
             n, p, smoothloss = self.subtrain(n, p, prep_seq, smoothloss, s_len)
+        self.end_train(n, smoothloss)
+
+    def train_NTOL(self, sequence, N, TOL):
+        _, p, prep_seq, smoothloss, s_len = self.prep_train(sequence)
+        for n in xrange(int(N)):
+            _, p, smoothloss = self.subtrain(n, p, prep_seq, smoothloss, s_len)
+            if smoothloss < TOL:
+                break
         self.end_train(n, smoothloss)
 
 
