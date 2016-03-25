@@ -1,10 +1,10 @@
-#!usr/bin/python
+#!/usr/bin/python
 
 from pymod.rnn import RNN as RNN
 from pymod.char import CharCodec as CCodec
 import pickle
 
-f = open('twc_clean.txt', 'r')
+f = open('Yeats/anthology.txt', 'r')
 str_dataset = f.read().lower()
 seq_length = len(str_dataset)
 cc = CCodec(str_dataset)
@@ -26,6 +26,6 @@ rnn.set_padd(30)
 rnn.set_clip(10)
 rnn.set_codec(cc)
 rnn.train_N(int_dataset, 1e6)
-f = open('rnn4_alt.bin', 'wb')
+f = open('yeats_rnn.bin', 'wb')
 pickle.dump(rnn, f)
 f.close()
