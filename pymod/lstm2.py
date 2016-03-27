@@ -4,8 +4,7 @@ import numpy as np
 import numpy.random as nr
 import onehot as oh
 
-# TODO sig & dsig
-# REAL ABASI TODO: REWRITE ALL THIS SHIT SO IT AINT SHIT
+# possible TODO set up custom lengths for all the specific gates
 
 def sig(x):
     denom = 1 + np.exp(x)
@@ -23,17 +22,19 @@ class LSTM:
         book, 'Supervised Sequence Labelling with Recurrent Neural Networks' and
         his 2014 paper, 'Generating Sequences with RNN'
     """
+    # test
 
-    # yeah, im defining a modular LSTM object if I ever improve this project once I'm done
-    # LSTM grids
-    # LSTM cubes
-    # LSTM hypercubes
-    def __init__(self, x_len, w_scale):
+    def __init__(self, x_len, h_len, y_len, w_scale):
         self.x_len = int(x_len)
+        self.h_len = int(h_len)
+        self.y_len = int(y_len)
 
-        # stores the most recent sequence data given to the LSTM
-        self.x = np.zeros((x_len, 1))
-
+        # hyperparams
+        self.clip_mag = 5
+        self.rollback = 100
+        self.freq = 100
+        self.step_size = 1e-1
+        self.padd = self.rollback
 
         # model hyperparams
         self.step_size = 1e-1
@@ -41,12 +42,8 @@ class LSTM:
         self.rollback_len = 100
 
         # sample params
-        self.freq = 100
-        self.sample_len = 1000
+        self.sample_len = 500
         self.text = False
-
-        # Why aren't I defining an LSTM object?  I think bptt might be wonky between objects
-        # gonna hardcode first
 
         ##############
         #    LSTM    #
@@ -56,36 +53,40 @@ class LSTM:
         # its output gets fed into LSTM1
 
         # defines the input gate, the argument of its activation function, and the biases and weights used to calculate it
-        self.gate_i = np.zeros((x_len, 1))
-        self.w_x_i = w_scale * np.diag(nr.randn(x_len))
-        self.w_h_i = w_scale * np.diag(nr.randn(x_len))
-        self.w_c_i = w_scale * np.diag(nr.randn(x_len))
-        self.w_i = w_scale * nr.randn(x_len, 1)
+        self.gate_i = np.zeros((h_len, 1))
+        self.w_x_i = w_scale * nr.randn(h_len, x_len)
+        self.w_h_i = w_scale * nr.randn(h_len, h_len)
+        self.w_c_i = w_scale * nr.randn(h_len, h_len)
+        self.w_i = w_scale * nr.randn(h_len, 1)
 
         # defines the forget gate, the argument of its activation function, and the biases and weights used to calculate it
         self.gate_f = np.zeros((x_len, 1))
-        self.w_x_f = w_scale * np.diag(nr.randn(x_len))
-        self.w_h_f = w_scale * np.diag(nr.randn(x_len))
-        self.w_c_f = w_scale * np.diag(nr.randn(x_len))
-        self.w_f = np.ones((x_len, 1)) # supposedly works better with ones
+        self.w_x_f = w_scale * nr.randn(h_len, x_len)
+        self.w_h_f = w_scale * nr.randn(h_len, h_len)
+        self.w_c_f = w_scale * nr.randn(h_len, h_len)
+        self.w_f = np.ones((h_len, 1)) # supposedly works better with ones
 
         # defines the cell state, the argument of its activation function, and the biases and weights used to calculate it
-        self.cell = np.zeros((x_len, 1))
-        self.c_tan = np.zeros((x_len, 1))
-        self.w_x_c = w_scale * np.diag(nr.randn(x_len))
-        self.w_h_c = w_scale * np.diag(nr.randn(x_len))
-        self.w_c = w_scale * nr.randn(x_len, 1)
+        self.cell = np.zeros((h_len, 1))
+        self.c_tan = np.zeros((h_len, 1))
+        self.w_x_c = w_scale * nr.randn(h_len, x_len)
+        self.w_h_c = w_scale * nr.randn(h_len, h_len)
+        self.w_c = w_scale * nr.randn(h_len, 1)
 
         # defines the output gate, the argument of its activation function, and the biases and weights used to calculate it
         self.gate_o = np.zeros((x_len, 1))
-        self.w_x_o = w_scale * np.diag(nr.randn(x_len))
-        self.w_h_o = w_scale * np.diag(nr.randn(x_len))
-        self.w_c_o = w_scale * np.diag(nr.randn(x_len))
-        self.w_o = w_scale * nr.randn(x_len, 1)
+        self.w_x_o = w_scale * nr.randn(h_len, x_len)
+        self.w_h_o = w_scale * nr.randn(h_len, h_len)
+        self.w_c_o = w_scale * nr.randn(h_len, h_len)
+        self.w_o = w_scale * nr.randn(h_len, 1)
 
         # the hidden output of the lstm
-        self.hidden = np.zeros((x_len, 1))
-        self.p = np.zeros((x_len, 1))
+        self.hidden = np.zeros((h_len, 1))
+
+        # maps the hidden layers to the y_len
+        # self.map = np.zeros((y_len, 1))
+        self.w_y = w_scale * nr.randn(y_len, h_len)
+        self.prob = np.zeros((y_len, 1))
 
 
     # OK
@@ -94,7 +95,9 @@ class LSTM:
         data = oh.hcol(x, self.x_len)
         self.x = data
 
-        i_arg = np.dot(self.w_x_i, data) + np.dot(self.w_h_i, self.hidden)
+        i_arg = np.dot(self.w_x_i, data)
+        # print i_arg.shape, self.hidden.shape
+        i_arg += np.dot(self.w_h_i, self.hidden)
         i_arg += np.dot(self.w_c_i, self.cell) + self.w_i
         self.gate_i = sig(i_arg)
 
@@ -112,9 +115,12 @@ class LSTM:
         self.gate_o = sig(o_arg)
 
         self.hidden = self.gate_o * np.tanh(self.cell)
+        # print self.hidden.shape
+        y_map = np.dot(self.w_y, self.hidden)
 
-        self.p = softmax(self.hidden)
-        return np.argmax(self.p)
+        self.prob = softmax(y_map)
+        # print 'ff'
+        return np.argmax(self.prob)
 
 
     def bptt(self, dataseq, targets):
@@ -136,8 +142,9 @@ class LSTM:
             c_seq[t] = self.cell
             o_seq[t] = self.gate_o
             h_seq[t] = self.hidden
-            p_seq[t] = self.p
-            loss -= np.log(self.p[targets[t]])
+            # m_seq[t] = self.map
+            p_seq[t] = self.prob
+            loss -= np.log(self.prob[targets[t]])
 
         # gradients for the input gate
         self.g_x_i = np.zeros_like(self.w_x_i)
@@ -162,13 +169,19 @@ class LSTM:
         self.g_c_o = np.zeros_like(self.w_c_o)
         self.g_o = np.zeros_like(self.w_o)
 
+        # gradient for the output weight
+        self.g_y = np.zeros_like(self.w_y)
+
         # these are the terms used to get the partial derivatives from the t=1
         # elem as well
-        c_epsilon = np.zeros((self.x_len, 1))
-        h_epsilon = np.zeros((self.x_len, 1))
+        c_epsilon = np.zeros_like(self.cell)
+        f_epsilon = np.zeros_like(self.gate_f)
+        h_epsilon = np.zeros_like(self.hidden)
         for t in reversed(xrange(seq_len)):
-            h_delta = p_seq[t]
-            h_delta[targets[t]] -= 1
+            p_delta = p_seq[t]
+            p_delta[targets[t]] -= 1
+            self.g_y += np.dot(p_delta, h_seq[t].T)
+            h_delta = np.dot(self.w_y.T, p_delta)
             h_delta += h_epsilon
 
             o_delta = h_delta * np.tanh(c_seq[t])
@@ -200,18 +213,15 @@ class LSTM:
 
             c_epsilon = c_delta * f_seq[t]
             c_epsilon += np.dot(self.w_c_f.T, f_delta)
-            c_epsilon += np.dot(self.w_c_i.T, i_delta)
             h_epsilon = np.dot(self.w_h_o.T, o_delta)
             h_epsilon += np.dot(self.w_h_c.T, ct_delta)
-            h_epsilon += np.dot(self.w_h_f.T, f_delta)
             h_epsilon += np.dot(self.w_h_i.T, i_delta)
 
         grad = [
-            self.g_x_i, self.g_h_i, self.g_c_i, self.g_i,
-            self.g_x_f, self.g_h_f, self.g_c_f, self.g_f,
-            self.g_x_c, self.g_h_c, self.g_c,
-            self.g_x_o, self.g_h_o, self.g_c_o, self.g_o,
-            self.g_y
+        self.g_x_i, self.g_h_i, self.g_c_i, self.g_i,
+        self.g_x_f, self.g_h_f, self.g_c_f, self.g_f,
+        self.g_x_c, self.g_h_c, self.g_c,
+        self.g_x_o, self.g_h_o, self.g_c_o, self.g_o
             ]
 
         for g in grad:
@@ -269,7 +279,7 @@ class LSTM:
         localsmooth = 0.999 * smoothloss + 0.001 * loss
         self.adagrad()
 
-        return n + 1, p + self.rollback_len, localsmooth
+        return n + 1, p + 1, localsmooth
 
     def end_train(self, n, smoothloss):
         if self.text:
@@ -300,19 +310,22 @@ class LSTM:
                 self.w_x_i, self.w_h_i, self.w_c_i, self.w_i,
                 self.w_x_f, self.w_h_f, self.w_c_f, self.w_f,
                 self.w_x_c, self.w_h_c, self.w_c,
-                self.w_x_o, self.w_h_o, self.w_c_o, self.w_o
+                self.w_x_o, self.w_h_o, self.w_c_o, self.w_o,
+                self.w_y
             ]
         grad = [
                 self.g_x_i, self.g_h_i, self.g_c_i, self.g_i,
                 self.g_x_f, self.g_h_f, self.g_c_f, self.g_f,
                 self.g_x_c, self.g_h_c, self.g_c,
-                self.g_x_o, self.g_h_o, self.g_c_o, self.g_o
+                self.g_x_o, self.g_h_o, self.g_c_o, self.g_o,
+                self.g_y
             ]
         mem = [
                 self.m_x_i, self.m_h_i, self.m_c_i, self.m_i,
                 self.m_x_f, self.m_h_f, self.m_c_f, self.m_f,
                 self.m_x_c, self.m_h_c, self.m_c,
-                self.m_x_o, self.m_h_o, self.m_c_o, self.m_o
+                self.m_x_o, self.m_h_o, self.m_c_o, self.m_o,
+                self.m_y
             ]
         for w, g, m in zip(weight, grad, mem):
             m += np.square(g)
@@ -320,31 +333,32 @@ class LSTM:
 
 
     def reset_cells(self):
-        self.gate_i = np.zeros((self.x_len, 1))
-        self.gate_f = np.zeros((self.x_len, 1))
-        self.c_tan = np.zeros((self.x_len, 1))
-        self.cell = np.zeros((self.x_len, 1))
-        self.gate_o = np.zeros((self.x_len, 1))
-        self.hidden = np.zeros((self.x_len, 1))
-        self.p = np.zeros((self.x_len, 1))
+        self.gate_i = np.zeros_like(self.gate_i)
+        self.gate_f = np.zeros_like(self.gate_f)
+        self.c_tan = np.zeros_like(self.c_tan)
+        self.cell = np.zeros_like(self.cell)
+        self.gate_o = np.zeros_like(self.gate_o)
+        self.hidden = np.zeros_like(self.hidden)
+        self.prob = np.zeros_like(self.prob)
 
 
     def reset_mem(self):
-        self.m_x_i = np.zeros((self.x_len, self.x_len))
-        self.m_h_i = np.zeros((self.x_len, self.x_len))
-        self.m_c_i = np.zeros((self.x_len, self.x_len))
-        self.m_i = np.zeros((self.x_len, 1))
-        self.m_x_f = np.zeros((self.x_len, self.x_len))
-        self.m_h_f = np.zeros((self.x_len, self.x_len))
-        self.m_c_f = np.zeros((self.x_len, self.x_len))
-        self.m_f = np.zeros((self.x_len, 1))
-        self.m_x_c = np.zeros((self.x_len, self.x_len))
-        self.m_h_c = np.zeros((self.x_len, self.x_len))
-        self.m_c = np.zeros((self.x_len, 1))
-        self.m_x_o = np.zeros((self.x_len, self.x_len))
-        self.m_h_o = np.zeros((self.x_len, self.x_len))
-        self.m_c_o = np.zeros((self.x_len, self.x_len))
-        self.m_o = np.zeros((self.x_len, 1))
+        self.m_x_i = np.zeros_like(self.w_x_i)
+        self.m_h_i = np.zeros_like(self.w_h_i)
+        self.m_c_i = np.zeros_like(self.w_c_i)
+        self.m_i = np.zeros_like(self.w_i)
+        self.m_x_f = np.zeros_like(self.w_x_f)
+        self.m_h_f = np.zeros_like(self.w_h_f)
+        self.m_c_f = np.zeros_like(self.w_c_f)
+        self.m_f = np.zeros_like(self.w_f)
+        self.m_x_c = np.zeros_like(self.w_x_c)
+        self.m_h_c = np.zeros_like(self.w_h_c)
+        self.m_c = np.zeros_like(self.w_c)
+        self.m_x_o = np.zeros_like(self.w_x_o)
+        self.m_h_o = np.zeros_like(self.w_h_o)
+        self.m_c_o = np.zeros_like(self.w_c_o)
+        self.m_o = np.zeros_like(self.w_o)
+        self.m_y = np.zeros_like(self.w_y)
 
 
     def set_freq(self, freq):
